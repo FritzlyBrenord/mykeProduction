@@ -216,6 +216,7 @@ export interface Video {
   slug: string;
   video_url: string | null;
   video_type: 'upload' | 'youtube' | 'vimeo';
+  thumbnail_url: string | null;
   access_type: 'public' | 'members' | 'paid';
   price: number;
   status: 'published' | 'draft' | 'archived';

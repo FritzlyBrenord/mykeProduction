@@ -1,9 +1,6 @@
 ﻿import type { ReactNode } from "react";
+import "./admin.css";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      {children}
-    </div>
-  );
+  return <div className="min-h-screen">{children}</div>;
 }

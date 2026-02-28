@@ -20,7 +20,12 @@ export async function POST(request: NextRequest) {
             const buffer = await file.arrayBuffer();
 
             // Déterminer le bucket basé sur le dossier
-            const bucketName = folder === 'documents' ? 'documents' : 'images';
+            let bucketName = 'images';
+            if (folder === 'documents') {
+                bucketName = 'documents';
+            } else if (folder === 'videos') {
+                bucketName = 'videos';
+            }
 
             const { data, error } = await supabaseAdmin.storage
                 .from(bucketName)
@@ -41,10 +46,11 @@ export async function POST(request: NextRequest) {
         const urls = await Promise.all(uploadPromises);
 
         return NextResponse.json({ urls });
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Failed to upload files';
         console.error('Upload error:', error);
         return NextResponse.json(
-            { error: 'Failed to upload files', details: error.message },
+            { error: 'Failed to upload files', details: message },
             { status: 500 }
         );
     }
