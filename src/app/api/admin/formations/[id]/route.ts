@@ -89,7 +89,32 @@ async function getFormationGraph(id: string) {
     lecons: lessons.filter((lesson) => lesson.module_id === module.id),
   }));
 
-  return { ...formation, modules: modulesWithLessons };
+  const { data: enrollments, error: enrollmentsError } = await supabaseAdmin
+    .from('enrollments')
+    .select(
+      `
+        id,
+        user_id,
+        enrolled_at,
+        completed_at,
+        progress,
+        user:profiles(
+          id,
+          full_name,
+          avatar_url
+        )
+      `,
+    )
+    .eq('formation_id', id)
+    .order('enrolled_at', { ascending: false });
+
+  if (enrollmentsError) throw enrollmentsError;
+
+  return {
+    ...formation,
+    modules: modulesWithLessons,
+    enrollments: enrollments || [],
+  };
 }
 
 // GET /api/admin/formations/[id]

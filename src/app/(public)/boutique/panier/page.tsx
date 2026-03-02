@@ -1,144 +1,78 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { 
-  ShoppingCart, Trash2, Plus, Minus, ArrowRight, 
-  Package, AlertCircle, Tag, CheckCircle 
-} from 'lucide-react';
-import { CartItem } from '@/lib/types';
-import { formatPrice } from '@/lib/utils/format';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { toast } from 'sonner';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useCart } from '@/lib/hooks/useCart';
+import { formatPrice } from '@/lib/utils/format';
+import { motion } from 'framer-motion';
+import {
+  AlertCircle,
+  ArrowRight,
+  Minus,
+  Plus,
+  ShoppingCart,
+  Trash2,
+} from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
-const mockCartItems: CartItem[] = [
-  {
-    id: '1',
-    cart_id: '1',
-    produit_id: '1',
-    item_type: 'produit',
-    quantity: 2,
-    unit_price: 45.90,
-    added_at: '2024-02-20',
-    produit: {
-      id: '1',
-      name: 'Acide sulfurique 98% - 1L',
-      slug: 'acide-sulfurique-98-1l',
-      description: 'Acide sulfurique concentré de haute pureté',
-      price: 45.90,
-      images: ['https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?w=800'],
-      type: 'chimique',
-      stock: 50,
-      is_digital: false,
-      cas_number: '7664-93-9',
-      purity: '98%',
-      unit: 'L',
-      min_order: 1,
-      ghs_pictograms: ['GHS05', 'GHS07'],
-      hazard_statements: ['H314', 'H290'],
-      precautionary_statements: ['P280', 'P305+P351+P338'],
-      signal_word: 'Danger',
-      age_restricted: true,
-      restricted_sale: false,
-      status: 'published',
-      featured: true,
-      created_at: '2024-01-10',
-      updated_at: '2024-01-10',
-    }
-  },
-  {
-    id: '2',
-    cart_id: '1',
-    formation_id: '1',
-    item_type: 'formation',
-    quantity: 1,
-    unit_price: 199,
-    added_at: '2024-02-20',
-    formation: {
-      id: '1',
-      title: 'Introduction à la chimie industrielle',
-      slug: 'introduction-chimie-industrielle',
-      description: 'Apprenez les bases de la chimie industrielle',
-      thumbnail_url: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800',
-      price: 199,
-      is_free: false,
-      format: 'video',
-      status: 'published',
-      category_id: '1',
-      duration_hours: 12,
-      level: 'debutant',
-      language: 'fr',
-      certificate: true,
-      enrolled_count: 245,
-      rating_avg: 4.7,
-      created_at: '2024-01-15',
-      updated_at: '2024-01-15',
-    }
-  },
-];
+function getItemTitle(item: ReturnType<typeof useCart>['items'][number]) {
+  if (item.item_type === 'produit') return item.produit?.name || 'Produit';
+  if (item.item_type === 'formation') return item.formation?.title || 'Formation';
+  return item.video?.title || 'Video';
+}
+
+function getItemImage(item: ReturnType<typeof useCart>['items'][number]) {
+  if (item.item_type === 'produit') {
+    return item.produit?.images?.[0] || '/images/placeholder-product.jpg';
+  }
+  if (item.item_type === 'formation') {
+    return item.formation?.thumbnail_url || '/images/placeholder-formation.jpg';
+  }
+  return item.video?.thumbnail_url || '/images/placeholder-video.jpg';
+}
 
 export default function CartPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [cartItems, setCartItems] = useState<CartItem[]>(mockCartItems);
-  const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
-  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const { items, loading, removeItem, updateQuantity, clearCart } = useCart();
 
-  const updateQuantity = (itemId: string, newQuantity: number) => {
-    if (newQuantity < 1) return;
-    setCartItems(items => 
-      items.map(item => 
-        item.id === itemId ? { ...item, quantity: newQuantity } : item
-      )
-    );
-  };
-
-  const removeItem = (itemId: string) => {
-    setCartItems(items => items.filter(item => item.id !== itemId));
-    toast.success('Article retiré du panier');
-  };
-
-  const applyCoupon = () => {
-    if (!couponCode.trim()) return;
-    
-    setIsApplyingCoupon(true);
-    // Simulation
-    setTimeout(() => {
-      if (couponCode.toUpperCase() === 'PROMO10') {
-        setAppliedCoupon({ code: couponCode, discount: 10 });
-        toast.success('Code promo appliqué : -10%');
-      } else if (couponCode.toUpperCase() === 'WELCOME20') {
-        setAppliedCoupon({ code: couponCode, discount: 20 });
-        toast.success('Code promo appliqué : -20%');
-      } else {
-        toast.error('Code promo invalide');
-      }
-      setIsApplyingCoupon(false);
-    }, 500);
-  };
-
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-  const discountAmount = appliedCoupon ? (subtotal * appliedCoupon.discount / 100) : 0;
-  const shippingCost = subtotal > 100 ? 0 : 9.90;
-  const total = subtotal - discountAmount + shippingCost;
+  const subtotal = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+  const hasPhysicalProducts = items.some(
+    (item) => item.item_type === 'produit' && !(item.produit?.is_digital ?? false),
+  );
+  const shippingCost = hasPhysicalProducts ? (subtotal >= 100 ? 0 : 9.9) : 0;
+  const total = subtotal + shippingCost;
 
   const handleCheckout = () => {
     if (!user) {
-      toast.error('Vous devez être connecté pour passer commande');
+      toast.error('Connectez-vous pour finaliser la commande.');
       router.push('/auth/connexion');
       return;
     }
     router.push('/checkout');
   };
 
-  if (cartItems.length === 0) {
+  const handleClearCart = async () => {
+    await clearCart();
+    toast.success('Panier vide.');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 py-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-500">
+          Chargement du panier...
+        </div>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <motion.div
@@ -147,20 +81,14 @@ export default function CartPage() {
           className="text-center"
         >
           <ShoppingCart className="h-20 w-20 text-slate-300 mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">
-            Votre panier est vide
-          </h1>
-          <p className="text-slate-500 mb-6">
-            Découvrez nos formations et produits
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Votre panier est vide</h1>
+          <p className="text-slate-500 mb-6">Ajoutez des produits, formations ou videos.</p>
           <div className="flex gap-4 justify-center">
             <Link href="/formations">
-              <Button variant="outline">
-                Voir les formations
-              </Button>
+              <Button variant="outline">Voir les formations</Button>
             </Link>
             <Link href="/boutique">
-              <Button className="bg-blue-600 hover:bg-blue-700">
+              <Button className="bg-slate-900 hover:bg-amber-500 hover:text-slate-950">
                 Visiter la boutique
               </Button>
             </Link>
@@ -173,51 +101,63 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-slate-50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <h1 className="text-3xl font-bold text-slate-900 mb-8">
-            Votre panier ({cartItems.length} article{cartItems.length > 1 ? 's' : ''})
-          </h1>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+            <h1 className="text-3xl font-bold text-slate-900">
+              Votre panier ({items.length} article{items.length > 1 ? 's' : ''})
+            </h1>
+            <Button variant="outline" onClick={handleClearCart}>
+              Vider le panier
+            </Button>
+          </div>
+
+          {!user && (
+            <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <p>
+                Panier en mode invite. Connectez-vous et les articles seront synchronises automatiquement vers votre compte.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
-              {cartItems.map((item, index) => (
+              {items.map((item, index) => (
                 <motion.div
                   key={item.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
+                  transition={{ delay: index * 0.06 }}
                 >
                   <Card>
                     <CardContent className="p-4">
                       <div className="flex gap-4">
-                        {/* Image */}
-                        <div className="w-24 h-24 flex-shrink-0 bg-slate-100 rounded-lg overflow-hidden">
-                          <img
-                            src={item.produit?.images?.[0] || item.formation?.thumbnail_url || '/images/placeholder.jpg'}
-                            alt={item.produit?.name || item.formation?.title || ''}
-                            className="w-full h-full object-cover"
+                        <div className="w-24 h-24 flex-shrink-0 bg-slate-100 rounded-lg overflow-hidden relative">
+                          <Image
+                            src={getItemImage(item)}
+                            alt={getItemTitle(item)}
+                            fill
+                            className="object-cover"
                           />
                         </div>
 
-                        {/* Details */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-4">
                             <div>
                               <p className="text-sm text-slate-500 mb-1">
-                                {item.item_type === 'produit' ? 'Produit' : 
-                                 item.item_type === 'formation' ? 'Formation' : 'Vidéo'}
+                                {item.item_type === 'produit'
+                                  ? 'Produit'
+                                  : item.item_type === 'formation'
+                                    ? 'Formation'
+                                    : 'Video'}
                               </p>
                               <h3 className="font-semibold text-slate-900 line-clamp-2">
-                                {item.produit?.name || item.formation?.title}
+                                {getItemTitle(item)}
                               </h3>
-                              {item.produit?.type === 'chimique' && (
+                              {item.item_type === 'produit' && item.produit?.type === 'chimique' && (
                                 <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
                                   <AlertCircle className="h-3 w-3" />
-                                  Produit chimique - Vente réglementée
+                                  Produit chimique - vente reglementee
                                 </p>
                               )}
                             </div>
@@ -230,8 +170,7 @@ export default function CartPage() {
                           </div>
 
                           <div className="flex items-center justify-between mt-4">
-                            {/* Quantity */}
-                            {item.item_type === 'produit' && (
+                            {item.item_type === 'produit' ? (
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => updateQuantity(item.id, item.quantity - 1)}
@@ -247,15 +186,16 @@ export default function CartPage() {
                                   <Plus className="h-4 w-4" />
                                 </button>
                               </div>
+                            ) : (
+                              <p className="text-sm text-slate-500">Quantite fixe: 1</p>
                             )}
 
-                            {/* Price */}
                             <div className="text-right">
                               <p className="font-semibold text-slate-900">
-                                {formatPrice(item.unit_price * item.quantity)}
+                                {formatPrice(item.unit_price * item.quantity, 'USD')}
                               </p>
                               <p className="text-sm text-slate-500">
-                                {formatPrice(item.unit_price)} / unité
+                                {formatPrice(item.unit_price, 'USD')} / unite
                               </p>
                             </div>
                           </div>
@@ -267,7 +207,6 @@ export default function CartPage() {
               ))}
             </div>
 
-            {/* Summary */}
             <div className="lg:col-span-1">
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
@@ -277,78 +216,42 @@ export default function CartPage() {
               >
                 <Card>
                   <CardContent className="p-6">
-                    <h2 className="text-lg font-semibold text-slate-900 mb-4">
-                      Récapitulatif
-                    </h2>
-
-                    {/* Coupon */}
-                    <div className="mb-6">
-                      <label className="text-sm font-medium text-slate-700 mb-2 block">
-                        Code promo
-                      </label>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Entrez votre code"
-                          value={couponCode}
-                          onChange={(e) => setCouponCode(e.target.value)}
-                          disabled={!!appliedCoupon}
-                        />
-                        <Button
-                          variant="outline"
-                          onClick={appliedCoupon ? () => setAppliedCoupon(null) : applyCoupon}
-                          disabled={isApplyingCoupon}
-                        >
-                          {appliedCoupon ? (
-                            <X className="h-4 w-4" />
-                          ) : (
-                            <Tag className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                      {appliedCoupon && (
-                        <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
-                          <CheckCircle className="h-4 w-4" />
-                          Code {appliedCoupon.code} appliqué (-{appliedCoupon.discount}%)
-                        </p>
-                      )}
-                    </div>
-
-                    <Separator className="my-4" />
-
-                    {/* Totals */}
+                    <h2 className="text-lg font-semibold text-slate-900 mb-4">Recapitulatif</h2>
                     <div className="space-y-3">
                       <div className="flex justify-between text-slate-600">
                         <span>Sous-total</span>
-                        <span>{formatPrice(subtotal)}</span>
+                        <span>{formatPrice(subtotal, 'USD')}</span>
                       </div>
-                      {discountAmount > 0 && (
-                        <div className="flex justify-between text-green-600">
-                          <span>Réduction</span>
-                          <span>-{formatPrice(discountAmount)}</span>
-                        </div>
-                      )}
                       <div className="flex justify-between text-slate-600">
                         <span>Livraison</span>
-                        <span>{shippingCost === 0 ? 'Gratuite' : formatPrice(shippingCost)}</span>
+                        <span>
+                          {shippingCost === 0 ? 'Gratuite' : formatPrice(shippingCost, 'USD')}
+                        </span>
                       </div>
                       <Separator />
                       <div className="flex justify-between text-lg font-semibold text-slate-900">
                         <span>Total</span>
-                        <span>{formatPrice(total)}</span>
+                        <span>{formatPrice(total, 'USD')}</span>
                       </div>
                     </div>
 
-                    <Button 
-                      className="w-full mt-6 bg-blue-600 hover:bg-blue-700 h-12"
+                    <Button
+                      className="w-full mt-6 bg-slate-900 hover:bg-amber-500 hover:text-slate-950 h-12"
                       onClick={handleCheckout}
                     >
-                      Passer à la caisse
+                      Passer a la caisse
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
 
-                    <p className="text-xs text-slate-500 text-center mt-4">
-                      Livraison gratuite à partir de 100€ d'achat
-                    </p>
+                    {hasPhysicalProducts ? (
+                      <p className="text-xs text-slate-500 text-center mt-4">
+                        Livraison gratuite a partir de {formatPrice(100, 'USD')}.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-500 text-center mt-4">
+                        Aucun frais de livraison pour les contenus numeriques.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>

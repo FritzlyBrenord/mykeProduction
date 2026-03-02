@@ -1,17 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { 
-  Package, Download, ChevronRight, Clock, CheckCircle, 
-  Truck, XCircle, CreditCard 
-} from 'lucide-react';
-import { Commande } from '@/lib/types';
-import { formatPrice, formatDate } from '@/lib/utils/format';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -19,248 +10,459 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { formatDate, formatPrice } from '@/lib/utils/format';
+import { motion } from 'framer-motion';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  Eye,
+  Package,
+  PlayCircle,
+  Truck,
+  XCircle,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
-const mockOrders: Commande[] = [
-  {
-    id: 'cmd-001',
-    user_id: '1',
-    status: 'delivered',
-    subtotal: 290.80,
-    discount_amount: 0,
-    tax_amount: 58.16,
-    total_amount: 348.96,
-    currency: 'EUR',
-    coupon_id: null,
-    shipping_address: {
-      first_name: 'Jean',
-      last_name: 'Dupont',
-      address: '123 Rue de la Paix',
-      city: 'Paris',
-      postal_code: '75001',
-      country: 'FR',
-    },
-    payment_method: 'stripe',
-    created_at: '2024-02-15T10:30:00Z',
-    updated_at: '2024-02-18T14:20:00Z',
-    items: [
-      { id: '1', commande_id: 'cmd-001', produit_id: '1', item_type: 'produit', quantity: 2, unit_price: 45.90, total_price: 91.80 },
-      { id: '2', commande_id: 'cmd-001', formation_id: '1', item_type: 'formation', quantity: 1, unit_price: 199, total_price: 199 },
-    ],
+interface OrderItem {
+  id: string;
+  item_type: 'produit' | 'formation' | 'video';
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  formation_authorized?: boolean | null;
+  formation_progress?: number | null;
+  produit: { name: string | null; slug: string | null; type?: string | null } | null;
+  formation: { title: string | null; slug: string | null } | null;
+  video: { title: string | null; slug: string | null } | null;
+}
+
+interface Order {
+  id: string;
+  status: string;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  currency: string;
+  shipping_address: Record<string, unknown> | null;
+  payment_method: 'stripe' | 'paypal' | null;
+  created_at: string;
+  items: OrderItem[];
+}
+
+const statusConfig: Record<
+  string,
+  { label: string; className: string; icon: typeof Clock }
+> = {
+  pending: {
+    label: 'En attente',
+    className: 'bg-slate-100 text-slate-700 border-slate-200',
+    icon: Clock,
   },
-  {
-    id: 'cmd-002',
-    user_id: '1',
-    status: 'processing',
-    subtotal: 89.90,
-    discount_amount: 10,
-    tax_amount: 15.98,
-    total_amount: 95.88,
-    currency: 'EUR',
-    coupon_id: '1',
-    shipping_address: {
-      first_name: 'Jean',
-      last_name: 'Dupont',
-      address: '123 Rue de la Paix',
-      city: 'Paris',
-      postal_code: '75001',
-      country: 'FR',
-    },
-    payment_method: 'paypal',
-    created_at: '2024-02-20T09:15:00Z',
-    updated_at: '2024-02-20T09:15:00Z',
-    items: [
-      { id: '3', commande_id: 'cmd-002', produit_id: '4', item_type: 'produit', quantity: 1, unit_price: 89.90, total_price: 89.90 },
-    ],
+  paid: {
+    label: 'Payee',
+    className: 'bg-blue-100 text-blue-700 border-blue-200',
+    icon: CreditCard,
   },
-];
-
-const getStatusBadge = (status: string) => {
-  const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: any }> = {
-    pending: { label: 'En attente', variant: 'secondary', icon: Clock },
-    paid: { label: 'Payée', variant: 'default', icon: CreditCard },
-    processing: { label: 'En préparation', variant: 'default', icon: Package },
-    shipped: { label: 'Expédiée', variant: 'default', icon: Truck },
-    delivered: { label: 'Livrée', variant: 'default', icon: CheckCircle },
-    cancelled: { label: 'Annulée', variant: 'destructive', icon: XCircle },
-    refunded: { label: 'Remboursée', variant: 'outline', icon: CreditCard },
-  };
-
-  const config = statusConfig[status] || statusConfig.pending;
-  const Icon = config.icon;
-
-  return (
-    <Badge variant={config.variant} className="flex items-center gap-1 w-fit">
-      <Icon className="h-3 w-3" />
-      {config.label}
-    </Badge>
-  );
+  processing: {
+    label: 'En traitement',
+    className: 'bg-amber-100 text-amber-800 border-amber-200',
+    icon: Package,
+  },
+  shipped: {
+    label: 'Expediee',
+    className: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    icon: Truck,
+  },
+  delivered: {
+    label: 'Livree',
+    className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    icon: CheckCircle2,
+  },
+  cancelled: {
+    label: 'Annulee',
+    className: 'bg-red-100 text-red-700 border-red-200',
+    icon: XCircle,
+  },
+  refunded: {
+    label: 'Remboursee',
+    className: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200',
+    icon: CreditCard,
+  },
 };
 
+const statusProgress: Record<string, number> = {
+  pending: 15,
+  paid: 35,
+  processing: 55,
+  shipped: 80,
+  delivered: 100,
+  cancelled: 100,
+  refunded: 100,
+};
+
+function orderStatusBadge(status: string) {
+  const config = statusConfig[status] ?? statusConfig.pending;
+  const Icon = config.icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${config.className}`}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {config.label}
+    </span>
+  );
+}
+
+function itemLabel(item: OrderItem) {
+  if (item.item_type === 'produit') return item.produit?.name || 'Produit';
+  if (item.item_type === 'formation') return item.formation?.title || 'Formation';
+  return item.video?.title || 'Video';
+}
+
+function itemTypeBadge(item: OrderItem) {
+  if (item.item_type === 'formation') {
+    return (
+      <Badge className="bg-blue-100 text-blue-700 border-blue-200">Formation</Badge>
+    );
+  }
+  if (item.item_type === 'video') {
+    return (
+      <Badge className="bg-purple-100 text-purple-700 border-purple-200">Video</Badge>
+    );
+  }
+  if (item.produit?.type === 'chimique') {
+    return (
+      <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+        Produit chimique
+      </Badge>
+    );
+  }
+  return <Badge className="bg-slate-100 text-slate-700 border-slate-200">Produit</Badge>;
+}
+
+function shortOrderId(orderId: string) {
+  return `#${orderId.slice(0, 8)}`;
+}
+
+function formationProgressLabel(
+  authorized: boolean | null | undefined,
+  progress: number | null | undefined,
+) {
+  if (!authorized) {
+    return "En attente d'autorisation admin";
+  }
+  const value = Number(progress ?? 0);
+  if (value <= 0) {
+    return 'Non commencee';
+  }
+  return `${value}%`;
+}
+
 export default function OrdersPage() {
-  const [selectedOrder, setSelectedOrder] = useState<Commande | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const loadOrders = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/commandes', { credentials: 'include' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.error || 'Erreur chargement commandes');
+        }
+        if (!active) return;
+        setOrders(Array.isArray(data) ? (data as Order[]) : []);
+      } catch (error) {
+        console.error('Orders load error:', error);
+        toast.error("Impossible de recuperer l'historique des commandes.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    loadOrders();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const metrics = useMemo(() => {
+    const total = orders.length;
+    const processing = orders.filter((order) =>
+      ['pending', 'paid', 'processing', 'shipped'].includes(order.status),
+    ).length;
+    const delivered = orders.filter((order) => order.status === 'delivered').length;
+    const formationPending = orders
+      .flatMap((order) => order.items || [])
+      .filter(
+        (item) => item.item_type === 'formation' && item.formation_authorized === false,
+      ).length;
+    return { total, processing, delivered, formationPending };
+  }, [orders]);
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-100 py-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
+          className="rounded-3xl border border-blue-200 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-800 p-6 md:p-8"
         >
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Mes commandes</h1>
-          <p className="text-slate-600 mb-8">
-            Consultez l'historique et le suivi de vos commandes
+          <h1 className="text-3xl md:text-4xl font-bold text-white">Mes commandes</h1>
+          <p className="text-slate-200 mt-2 max-w-3xl">
+            Suivez toutes vos commandes en un seul endroit: produits, videos et
+            formations.
           </p>
+        </motion.div>
 
-          {mockOrders.length > 0 ? (
-            <div className="space-y-4">
-              {mockOrders.map((order) => (
-                <Card key={order.id} className="overflow-hidden">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                      {/* Order Info */}
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-3 mb-2">
-                          <span className="font-semibold text-slate-900">{order.id.toUpperCase()}</span>
-                          {getStatusBadge(order.status)}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-4"
+        >
+          <Card className="border-slate-200">
+            <CardContent className="p-5">
+              <p className="text-sm text-slate-500">Total commandes</p>
+              <p className="text-3xl font-bold text-slate-900 mt-1">{metrics.total}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-200">
+            <CardContent className="p-5">
+              <p className="text-sm text-slate-500">En cours</p>
+              <p className="text-3xl font-bold text-amber-700 mt-1">{metrics.processing}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-200">
+            <CardContent className="p-5">
+              <p className="text-sm text-slate-500">Livrees</p>
+              <p className="text-3xl font-bold text-emerald-700 mt-1">{metrics.delivered}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-200">
+            <CardContent className="p-5">
+              <p className="text-sm text-slate-500">Formations en attente</p>
+              <p className="text-3xl font-bold text-blue-700 mt-1">
+                {metrics.formationPending}
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {loading ? (
+          <Card className="border-slate-200">
+            <CardContent className="p-10 text-center text-slate-600">
+              Chargement des commandes...
+            </CardContent>
+          </Card>
+        ) : orders.length > 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-4"
+          >
+            {orders.map((order) => (
+              <Card key={order.id} className="border-slate-200 shadow-sm">
+                <CardContent className="p-5 md:p-6">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-slate-900">{shortOrderId(order.id)}</p>
+                          {orderStatusBadge(order.status)}
                         </div>
-                        <p className="text-sm text-slate-500 mb-1">
-                          Passée le {formatDate(order.created_at)}
+                        <p className="text-sm text-slate-600 mt-1">
+                          Passee le {formatDate(order.created_at)}
                         </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
                         <p className="text-lg font-semibold text-slate-900">
-                          {formatPrice(order.total_amount)}
+                          {formatPrice(order.total_amount, order.currency || 'USD')}
                         </p>
-                      </div>
-
-                      {/* Items Preview */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex -space-x-2">
-                          {order.items?.slice(0, 3).map((item, index) => (
-                            <div
-                              key={index}
-                              className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-xs font-medium"
-                            >
-                              {item.item_type === 'produit' ? 'P' : item.item_type === 'formation' ? 'F' : 'V'}
-                            </div>
-                          ))}
-                          {(order.items?.length || 0) > 3 && (
-                            <div className="w-10 h-10 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-xs">
-                              +{(order.items?.length || 0) - 3}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-2">
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="outline" onClick={() => setSelectedOrder(order)}>
-                              Détails
+                            <Button variant="outline">
+                              <Eye className="h-4 w-4 mr-2" />
+                              Details
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-2xl">
+                          <DialogContent className="max-w-3xl">
                             <DialogHeader>
-                              <DialogTitle>Commande {order.id.toUpperCase()}</DialogTitle>
+                              <DialogTitle>Suivi commande {shortOrderId(order.id)}</DialogTitle>
                             </DialogHeader>
-                            <div className="space-y-4">
-                              {/* Status */}
-                              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                <span className="text-slate-600">Statut</span>
-                                {getStatusBadge(order.status)}
-                              </div>
 
-                              {/* Items */}
-                              <div>
-                                <h4 className="font-semibold text-slate-900 mb-3">Articles</h4>
-                                <div className="space-y-2">
-                                  {order.items?.map((item) => (
-                                    <div
-                                      key={item.id}
-                                      className="flex items-center justify-between p-3 border rounded-lg"
-                                    >
-                                      <div>
-                                        <p className="font-medium text-slate-900">
-                                          {item.item_type === 'produit' ? 'Produit' : 
-                                           item.item_type === 'formation' ? 'Formation' : 'Vidéo'}
-                                        </p>
-                                        <p className="text-sm text-slate-500">
-                                          Quantité: {item.quantity}
-                                        </p>
-                                      </div>
-                                      <span className="font-semibold">
-                                        {formatPrice(item.total_price)}
-                                      </span>
-                                    </div>
-                                  ))}
+                            <div className="space-y-4">
+                              <div className="rounded-xl bg-slate-100 p-4 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-slate-600">Statut global</span>
+                                  {orderStatusBadge(order.status)}
+                                </div>
+                                <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-blue-600 transition-all"
+                                    style={{
+                                      width: `${
+                                        statusProgress[order.status] ?? statusProgress.pending
+                                      }%`,
+                                    }}
+                                  />
                                 </div>
                               </div>
 
-                              {/* Totals */}
-                              <div className="space-y-2 pt-4 border-t">
-                                <div className="flex justify-between text-slate-600">
+                              <div className="space-y-2">
+                                {(order.items || []).map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        {itemTypeBadge(item)}
+                                        {item.item_type === 'formation' &&
+                                          (item.formation_authorized ? (
+                                            <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+                                              Autorisee
+                                            </Badge>
+                                          ) : (
+                                            <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                                              En attente d&apos;autorisation
+                                            </Badge>
+                                          ))}
+                                      </div>
+                                      <p className="font-medium text-slate-900 truncate">
+                                        {itemLabel(item)}
+                                      </p>
+                                      <p className="text-sm text-slate-600">
+                                        Quantite: {item.quantity}
+                                      </p>
+                                      {item.item_type === 'formation' && (
+                                        <p className="text-sm text-slate-600">
+                                          Acces:{' '}
+                                          {formationProgressLabel(
+                                            item.formation_authorized,
+                                            item.formation_progress,
+                                          )}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <p className="font-semibold text-slate-900">
+                                      {formatPrice(item.total_price, order.currency || 'USD')}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="flex justify-between text-sm text-slate-700">
                                   <span>Sous-total</span>
-                                  <span>{formatPrice(order.subtotal)}</span>
+                                  <span>{formatPrice(order.subtotal, order.currency || 'USD')}</span>
                                 </div>
                                 {order.discount_amount > 0 && (
-                                  <div className="flex justify-between text-green-600">
-                                    <span>Réduction</span>
-                                    <span>-{formatPrice(order.discount_amount)}</span>
+                                  <div className="flex justify-between text-sm text-emerald-700">
+                                    <span>Reduction</span>
+                                    <span>
+                                      -{formatPrice(order.discount_amount, order.currency || 'USD')}
+                                    </span>
                                   </div>
                                 )}
-                                <div className="flex justify-between text-slate-600">
-                                  <span>TVA</span>
-                                  <span>{formatPrice(order.tax_amount)}</span>
+                                <div className="flex justify-between text-sm text-slate-700">
+                                  <span>Taxes</span>
+                                  <span>{formatPrice(order.tax_amount, order.currency || 'USD')}</span>
                                 </div>
-                                <div className="flex justify-between text-lg font-semibold text-slate-900">
+                                <div className="flex justify-between text-lg font-semibold text-slate-900 pt-2 border-t border-slate-200">
                                   <span>Total</span>
-                                  <span>{formatPrice(order.total_amount)}</span>
+                                  <span>
+                                    {formatPrice(order.total_amount, order.currency || 'USD')}
+                                  </span>
                                 </div>
                               </div>
 
-                              {/* Shipping Address */}
-                              <div className="pt-4 border-t">
-                                <h4 className="font-semibold text-slate-900 mb-2">Adresse de livraison</h4>
-                                <p className="text-slate-600">
-                                  {order.shipping_address?.first_name} {order.shipping_address?.last_name}<br />
-                                  {order.shipping_address?.address}<br />
-                                  {order.shipping_address?.postal_code} {order.shipping_address?.city}<br />
-                                  {order.shipping_address?.country}
+                              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-start gap-2">
+                                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                <p>
+                                  Les formations apparaissent dans &quot;Mes formations&quot; en attente,
+                                  puis deviennent accessibles des qu&apos;elles sont autorisees.
                                 </p>
                               </div>
                             </div>
                           </DialogContent>
                         </Dialog>
-
-                        {order.status === 'delivered' && (
-                          <Button variant="outline" size="icon">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        )}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Package className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-slate-900 mb-2">
-                  Aucune commande
-                </h2>
-                <p className="text-slate-500 mb-6">
-                  Vous n'avez pas encore passé de commande
-                </p>
-                <Link href="/boutique">
-                  <Button className="bg-blue-600 hover:bg-blue-700">
-                    Découvrir la boutique
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          )}
-        </motion.div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {(order.items || []).slice(0, 4).map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5"
+                        >
+                          {itemTypeBadge(item)}
+                          <span className="text-sm text-slate-700 truncate max-w-[220px]">
+                            {itemLabel(item)}
+                          </span>
+                          {item.item_type === 'formation' && !item.formation_authorized && (
+                            <span className="text-xs text-amber-700 font-medium">
+                              En attente
+                            </span>
+                          )}
+                          {item.item_type === 'formation' && item.formation_authorized && (
+                            <span className="text-xs text-emerald-700 font-medium">
+                              {formationProgressLabel(
+                                item.formation_authorized,
+                                item.formation_progress,
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                      {(order.items || []).length > 4 && (
+                        <span className="text-xs text-slate-500 self-center">
+                          +{(order.items || []).length - 4} element(s)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </motion.div>
+        ) : (
+          <Card className="border-slate-200">
+            <CardContent className="p-12 text-center">
+              <Package className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-slate-900 mb-2">Aucune commande</h2>
+              <p className="text-slate-600 mb-6">
+                Vous n&apos;avez pas encore passe de commande.
+              </p>
+              <Link href="/boutique">
+                <Button className="bg-slate-900 hover:bg-slate-800 text-white">
+                  Decouvrir la boutique
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+
+        {orders.length > 0 && (
+          <div className="flex justify-end">
+            <Link href="/compte/formations">
+              <Button
+                variant="outline"
+                className="border-blue-300 text-blue-800 hover:bg-blue-50"
+              >
+                <PlayCircle className="h-4 w-4 mr-2" />
+                Voir mes formations
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

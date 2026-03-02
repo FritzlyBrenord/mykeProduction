@@ -1,6 +1,6 @@
-﻿import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 import "./admin.css";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  return <div className="min-h-screen">{children}</div>;
+  return <div className="admin-theme min-h-screen">{children}</div>;
 }

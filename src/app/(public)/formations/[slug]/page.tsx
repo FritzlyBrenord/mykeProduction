@@ -1,262 +1,194 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { useParams } from "next/navigation";
-import { motion } from "framer-motion";
-import {
-  Clock,
-  Users,
-  Star,
-  PlayCircle,
-  FileText,
-  CheckCircle,
-  BookOpen,
-  Award,
-  ArrowLeft,
-  ShoppingCart,
-  Lock,
-  Unlock,
-} from "lucide-react";
-import { Formation } from "@/lib/types";
-import { formatPrice } from "@/lib/utils/format";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCart } from "@/lib/hooks/useCart";
+import { Formation } from "@/lib/types";
+import { formatDate, formatPrice } from "@/lib/utils/format";
+import { motion } from "framer-motion";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+  ArrowLeft,
+  Award,
+  BookOpen,
+  CheckCircle,
+  Clock,
+  PlayCircle,
+  ShoppingCart,
+  Star,
+  Users,
+} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-// Données mockées
-const mockFormation: Formation = {
-  id: "1",
-  title: "Introduction à la chimie industrielle",
-  slug: "introduction-chimie-industrielle",
-  description:
-    "Cette formation complète vous permettra de maîtriser les bases de la chimie industrielle, des réactions chimiques fondamentales aux procédés de fabrication modernes. Vous apprendrez à comprendre et à appliquer les principes chimiques dans un contexte industriel.",
-  content:
-    "<h2>Contenu de la formation</h2><p>Dans cette formation, nous aborderons...</p>",
-  thumbnail_url:
-    "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800",
-  price: 199,
-  is_free: false,
-  format: "video",
-  status: "published",
-  category_id: "1",
-  duration_hours: 12,
-  level: "debutant",
-  language: "fr",
-  certificate: true,
-  enrolled_count: 245,
-  rating_avg: 4.7,
-  created_at: "2024-01-15",
-  updated_at: "2024-01-15",
-  category: { id: "1", name: "Chimie", slug: "chimie", type: "formation" },
-  author: {
-    id: "1",
-    email: "expert@mykeindustrie.com",
-    full_name: "Dr. Marie Laurent",
-    avatar_url:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200",
-    role: "admin",
-    is_active: true,
-    two_fa_enabled: false,
-    created_at: "2024-01-01",
-  },
-  modules: [
-    {
-      id: "1",
-      formation_id: "1",
-      title: "Module 1 : Fondamentaux de la chimie",
-      description: "Les bases indispensables",
-      order_index: 0,
-      lecons: [
-        {
-          id: "1",
-          module_id: "1",
-          title: "Structure de la matière",
-          content: "",
-          video_url: "",
-          video_type: null,
-          duration_min: 45,
-          order_index: 0,
-          is_preview: true,
-        },
-        {
-          id: "2",
-          module_id: "1",
-          title: "Les liaisons chimiques",
-          content: "",
-          video_url: "",
-          video_type: null,
-          duration_min: 50,
-          order_index: 1,
-          is_preview: false,
-        },
-        {
-          id: "3",
-          module_id: "1",
-          title: "Réactions chimiques de base",
-          content: "",
-          video_url: "",
-          video_type: null,
-          duration_min: 40,
-          order_index: 2,
-          is_preview: false,
-        },
-      ],
-    },
-    {
-      id: "2",
-      formation_id: "1",
-      title: "Module 2 : Procédés industriels",
-      description: "Applications industrielles",
-      order_index: 1,
-      lecons: [
-        {
-          id: "4",
-          module_id: "2",
-          title: "Synthèse industrielle",
-          content: "",
-          video_url: "",
-          video_type: null,
-          duration_min: 60,
-          order_index: 0,
-          is_preview: false,
-        },
-        {
-          id: "5",
-          module_id: "2",
-          title: "Contrôle qualité",
-          content: "",
-          video_url: "",
-          video_type: null,
-          duration_min: 55,
-          order_index: 1,
-          is_preview: false,
-        },
-      ],
-    },
-    {
-      id: "3",
-      formation_id: "1",
-      title: "Module 3 : Sécurité et environnement",
-      description: "Bonnes pratiques",
-      order_index: 2,
-      lecons: [
-        {
-          id: "6",
-          module_id: "3",
-          title: "Gestion des risques chimiques",
-          content: "",
-          video_url: "",
-          video_type: null,
-          duration_min: 45,
-          order_index: 0,
-          is_preview: false,
-        },
-        {
-          id: "7",
-          module_id: "3",
-          title: "Impact environnemental",
-          content: "",
-          video_url: "",
-          video_type: null,
-          duration_min: 50,
-          order_index: 1,
-          is_preview: false,
-        },
-      ],
-    },
-  ],
-};
+function levelLabel(level: Formation["level"]) {
+  if (level === "debutant") return "Debutant";
+  if (level === "intermediaire") return "Intermediaire";
+  if (level === "avance") return "Avance";
+  return "Tous niveaux";
+}
 
-const relatedFormations: Formation[] = [
-  {
-    id: "5",
-    title: "Hydrolyse acide : principes et applications",
-    slug: "hydrolyse-acide",
-    description:
-      "Comprendre les mécanismes d'hydrolyse acide et leurs applications industrielles.",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?w=800",
-    price: 149,
-    is_free: false,
-    format: "text",
-    status: "published",
-    category_id: "1",
-    duration_hours: 6,
-    level: "avance",
-    language: "fr",
-    certificate: false,
-    enrolled_count: 89,
-    rating_avg: 4.6,
-    created_at: "2024-02-15",
-    updated_at: "2024-02-15",
-  },
-  {
-    id: "2",
-    title: "Sécurité des procédés industriels",
-    slug: "securite-procedes-industriels",
-    description: "Maîtrisez les normes de sécurité et les bonnes pratiques.",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1581092921461-eab62e97a782?w=800",
-    price: 0,
-    is_free: true,
-    format: "text",
-    status: "published",
-    category_id: "2",
-    duration_hours: 8,
-    level: "intermediaire",
-    language: "fr",
-    certificate: true,
-    enrolled_count: 512,
-    rating_avg: 4.5,
-    created_at: "2024-02-01",
-    updated_at: "2024-02-01",
-  },
-];
+function resolvePublicationDate(formation: Formation) {
+  const maybePublishedAt = (
+    formation as Formation & { published_at?: string | null }
+  ).published_at;
+  return maybePublishedAt || formation.created_at;
+}
 
 export default function FormationDetailPage() {
-  const params = useParams();
-  const [isEnrolled, setIsEnrolled] = useState(false);
-  const formation = mockFormation;
+  const params = useParams<{ slug: string }>();
+  const router = useRouter();
+  const { addItem } = useCart();
 
-  const totalLessons =
-    formation.modules?.reduce(
-      (acc, module) => acc + (module.lecons?.length || 0),
-      0,
-    ) || 0;
-  const totalDuration =
-    formation.modules?.reduce(
-      (acc, module) =>
-        acc +
-        (module.lecons?.reduce(
-          (sum, lecon) => sum + (lecon.duration_min || 0),
-          0,
-        ) || 0),
-      0,
-    ) || 0;
+  const [formation, setFormation] = useState<Formation | null>(null);
+  const [relatedFormations, setRelatedFormations] = useState<Formation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
-  const handleEnroll = () => {
-    toast.success(
-      "Inscription réussie ! Vous pouvez maintenant accéder à la formation.",
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const slug = useMemo(() => {
+    if (!params?.slug) return "";
+    return Array.isArray(params.slug) ? params.slug[0] : params.slug;
+  }, [params]);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchFormation = async () => {
+      if (!slug) return;
+
+      try {
+        setIsLoading(true);
+        setErrorMessage(null);
+
+        const detailResponse = await fetch(
+          `/api/formations/${encodeURIComponent(slug)}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          },
+        );
+
+        if (!detailResponse.ok) {
+          if (detailResponse.status === 404) {
+            throw new Error("Formation introuvable.");
+          }
+          throw new Error("Impossible de charger la formation.");
+        }
+
+        const detailData = (await detailResponse.json()) as Formation;
+        if (!active) return;
+        setFormation(detailData);
+
+        const relatedParams = new URLSearchParams({
+          limit: "3",
+          exclude: slug,
+        });
+
+        if (detailData.category_id) {
+          relatedParams.set("categoryId", detailData.category_id);
+        }
+
+        const relatedResponse = await fetch(
+          `/api/formations?${relatedParams.toString()}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          },
+        );
+
+        if (!relatedResponse.ok) {
+          if (active) setRelatedFormations([]);
+          return;
+        }
+
+        const relatedData = (await relatedResponse.json()) as Formation[];
+        if (!active) return;
+        setRelatedFormations(
+          Array.isArray(relatedData) ? relatedData.slice(0, 3) : [],
+        );
+      } catch (error) {
+        if (!active) return;
+        setFormation(null);
+        setRelatedFormations([]);
+        setErrorMessage(
+          error instanceof Error ? error.message : "Erreur de chargement.",
+        );
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchFormation();
+
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
+  const handleAddToCart = async () => {
+    if (!formation || formation.is_free) return;
+
+    setIsAddingToCart(true);
+    try {
+      await addItem({
+        item_type: "formation",
+        item_id: formation.id,
+        unit_price: Number(formation.price) || 0,
+        quantity: 1,
+      });
+      toast.success("Formation ajoutee au panier.");
+      router.push("/boutique/panier");
+    } catch {
+      toast.error("Impossible d'ajouter la formation au panier.");
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
+
+  const handleFreeAccess = () => {
+    router.push(`/formations/${formation?.slug}/apprendre`);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 pt-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-500">
+          Chargement de la formation...
+        </div>
+      </div>
     );
-    setIsEnrolled(true);
-  };
+  }
 
-  const handleAddToCart = () => {
-    toast.success("Formation ajoutée au panier");
-  };
+  if (!formation || errorMessage) {
+    return (
+      <div className="min-h-screen bg-slate-50 pt-32">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-2xl font-semibold text-slate-900 mb-2">
+            Formation indisponible
+          </h1>
+          <p className="text-slate-500 mb-6">
+            {errorMessage ||
+              "Cette formation n'est pas accessible pour le moment."}
+          </p>
+          <Link href="/formations">
+            <Button variant="outline">Retour aux formations</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 pt-24">
-      {/* Breadcrumb */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <Link
@@ -269,21 +201,20 @@ export default function FormationDetailPage() {
         </div>
       </div>
 
-      {/* Hero Section */}
       <div className="bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
-            {/* Left Content */}
             <div className="lg:col-span-2">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                {/* Badges */}
                 <div className="flex flex-wrap gap-2 mb-4">
-                  <Badge className="bg-amber-500 hover:bg-amber-600">
-                    {formation.category?.name}
-                  </Badge>
+                  {formation.category?.name && (
+                    <Badge className="bg-amber-500 hover:bg-amber-600">
+                      {formation.category.name}
+                    </Badge>
+                  )}
                   {formation.is_free ? (
                     <Badge className="bg-green-500">Gratuit</Badge>
                   ) : (
@@ -303,63 +234,31 @@ export default function FormationDetailPage() {
                 <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
                   {formation.title}
                 </h1>
-
                 <p className="text-lg text-slate-600 mb-6">
                   {formation.description}
                 </p>
 
-                {/* Stats */}
                 <div className="flex flex-wrap items-center gap-6 text-sm text-slate-500 mb-6">
                   <span className="flex items-center gap-1">
                     <Clock className="h-4 w-4" />
-                    {formation.duration_hours}h de contenu
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <BookOpen className="h-4 w-4" />
-                    {totalLessons} leçons
+                    {formation.duration_hours ?? 0}h de contenu
                   </span>
                   <span className="flex items-center gap-1">
                     <Users className="h-4 w-4" />
-                    {formation.enrolled_count} inscrits
+                    {formation.enrolled_count ?? 0} inscrits
                   </span>
                   <span className="flex items-center gap-1">
                     <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                    {formation.rating_avg} ({formation.enrolled_count} avis)
+                    {Number(formation.rating_avg ?? 0).toFixed(1)}
                   </span>
                   <span className="flex items-center gap-1">
                     <PlayCircle className="h-4 w-4" />
-                    {formation.format === "video" ? "Vidéo" : "Texte"}
+                    {formation.format === "video" ? "Video" : "Texte"}
                   </span>
                 </div>
-
-                {/* Author */}
-                {formation.author && (
-                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg">
-                    <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden">
-                      {formation.author.avatar_url ? (
-                        <img
-                          src={formation.author.avatar_url}
-                          alt={formation.author.full_name || ""}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-amber-100 text-amber-600 font-bold">
-                          {formation.author.full_name?.charAt(0)}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-900">
-                        {formation.author.full_name}
-                      </p>
-                      <p className="text-sm text-slate-500">Formateur expert</p>
-                    </div>
-                  </div>
-                )}
               </motion.div>
             </div>
 
-            {/* Right Card */}
             <div className="lg:col-span-1">
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
@@ -369,13 +268,14 @@ export default function FormationDetailPage() {
               >
                 <Card className="shadow-xl border-0 overflow-hidden">
                   <div className="relative aspect-video">
-                    <img
+                    <Image
                       src={
                         formation.thumbnail_url ||
                         "/images/placeholder-formation.jpg"
                       }
                       alt={formation.title}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                       <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
@@ -391,57 +291,46 @@ export default function FormationDetailPage() {
                         </p>
                       ) : (
                         <p className="text-3xl font-bold text-slate-900">
-                          {formatPrice(formation.price)}
+                          {formatPrice(Number(formation.price) || 0, "USD")}
                         </p>
                       )}
                     </div>
 
-                    {isEnrolled ? (
-                      <Link href={`/formations/${formation.slug}/apprendre`}>
-                        <Button className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg">
-                          <PlayCircle className="mr-2 h-5 w-5" />
-                          Continuer la formation
+                    <div className="space-y-3">
+                      {formation.is_free ? (
+                        <Button
+                          className="w-full bg-slate-900 hover:bg-amber-500 hover:text-slate-950 h-12 text-lg"
+                          onClick={handleFreeAccess}
+                        >
+                          <BookOpen className="mr-2 h-5 w-5" />
+                          Acceder gratuitement
                         </Button>
-                      </Link>
-                    ) : (
-                      <div className="space-y-3">
-                        {formation.is_free ? (
-                          <Button
-                            className="w-full bg-slate-900 hover:bg-amber-500 hover:text-slate-950 h-12 text-lg"
-                            onClick={handleEnroll}
-                          >
-                            <BookOpen className="mr-2 h-5 w-5" />
-                            S'inscrire gratuitement
-                          </Button>
-                        ) : (
-                          <>
-                            <Button
-                              className="w-full bg-slate-900 hover:bg-amber-500 hover:text-slate-950 h-12 text-lg"
-                              onClick={handleAddToCart}
-                            >
-                              <ShoppingCart className="mr-2 h-5 w-5" />
-                              Ajouter au panier
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="w-full h-12"
-                              onClick={handleEnroll}
-                            >
-                              Acheter maintenant
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    )}
+                      ) : (
+                        <Button
+                          className="w-full bg-slate-900 hover:bg-amber-500 hover:text-slate-950 h-12 text-lg"
+                          onClick={handleAddToCart}
+                          disabled={isAddingToCart}
+                        >
+                          <ShoppingCart className="mr-2 h-5 w-5" />
+                          {isAddingToCart
+                            ? "Ajout en cours..."
+                            : "Ajouter au panier"}
+                        </Button>
+                      )}
+                    </div>
 
                     <div className="mt-6 space-y-3 text-sm text-slate-600">
                       <div className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        Accès illimité
+                        Formation publiee et disponible
                       </div>
                       <div className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        {totalLessons} leçons
+                        Niveau: {levelLabel(formation.level)}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        Langue: {formation.language || "fr"}
                       </div>
                       {formation.certificate && (
                         <div className="flex items-center gap-2">
@@ -449,10 +338,12 @@ export default function FormationDetailPage() {
                           Certificat de fin
                         </div>
                       )}
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        Support inclus
-                      </div>
+                      {!formation.is_free && (
+                        <div className="flex items-center gap-2 text-amber-700">
+                          <CheckCircle className="h-4 w-4 text-amber-600" />
+                          Formation payante: achat via panier requis
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -462,87 +353,77 @@ export default function FormationDetailPage() {
         </div>
       </div>
 
-      {/* Content Tabs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs defaultValue="program" className="w-full">
+      <div
+        ref={contentRef}
+        className="max-w-7xl text-black mx-auto px-4 sm:px-6 lg:px-8 py-8"
+      >
+        <Tabs defaultValue="overview" className="w-full">
           <TabsList className="mb-6">
-            <TabsTrigger value="program">Programme</TabsTrigger>
-            <TabsTrigger value="content">Contenu</TabsTrigger>
+            <TabsTrigger value="overview">Apercu</TabsTrigger>
+            <TabsTrigger value="content">Detail texte</TabsTrigger>
             <TabsTrigger value="reviews">Avis</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="program">
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-6">
-                Programme de la formation
+          <TabsContent value="overview">
+            <div className="bg-white rounded-lg shadow-sm border p-6 space-y-4">
+              <h2 className="text-xl font-bold text-slate-900">
+                Informations de la formation
               </h2>
-
-              <Accordion type="single" collapsible className="w-full">
-                {formation.modules?.map((module, moduleIndex) => (
-                  <AccordionItem key={module.id} value={module.id}>
-                    <AccordionTrigger className="hover:no-underline">
-                      <div className="flex items-center gap-4 text-left">
-                        <span className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-sm font-bold">
-                          {moduleIndex + 1}
-                        </span>
-                        <div>
-                          <p className="font-semibold text-slate-900">
-                            {module.title}
-                          </p>
-                          <p className="text-sm text-slate-500">
-                            {module.lecons?.length || 0} leçons
-                          </p>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="pl-12 space-y-2">
-                        {module.lecons?.map((lecon, leconIndex) => (
-                          <div
-                            key={lecon.id}
-                            className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors"
-                          >
-                            <div className="flex items-center gap-3">
-                              {lecon.is_preview ? (
-                                <Unlock className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <Lock className="h-4 w-4 text-slate-400" />
-                              )}
-                              <span className="text-sm text-slate-500">
-                                {moduleIndex + 1}.{leconIndex + 1}
-                              </span>
-                              <span className="text-slate-700">
-                                {lecon.title}
-                              </span>
-                              {lecon.is_preview && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Aperçu
-                                </Badge>
-                              )}
-                            </div>
-                            <span className="text-sm text-slate-500">
-                              {lecon.duration_min} min
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
+              <p className="text-slate-600">
+                Cette page publique montre les details de la formation. Les
+                modules et les lecons ne sont pas affiches ici.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-700">
+                <p>
+                  <strong>Format:</strong>{" "}
+                  {formation.format === "video" ? "Video" : "Texte"}
+                </p>
+                <p>
+                  <strong>Niveau:</strong> {levelLabel(formation.level)}
+                </p>
+                <p>
+                  <strong>Duree:</strong> {formation.duration_hours ?? 0}h
+                </p>
+                <p>
+                  <strong>Langue:</strong> {formation.language || "fr"}
+                </p>
+                <p>
+                  <strong>Date de publication:</strong>{" "}
+                  {formatDate(resolvePublicationDate(formation))}
+                </p>
+                <p>
+                  <strong>Derniere mise a jour:</strong>{" "}
+                  {formatDate(formation.updated_at)}
+                </p>
+                <p>
+                  <strong>Categorie:</strong>{" "}
+                  {formation.category?.name || "Non definie"}
+                </p>
+                <p>
+                  <strong>Prix:</strong>{" "}
+                  {formation.is_free
+                    ? "Gratuit"
+                    : formatPrice(Number(formation.price) || 0, "USD")}
+                </p>
+              </div>
             </div>
           </TabsContent>
 
           <TabsContent value="content">
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <h2 className="text-xl font-bold text-slate-900 mb-4">
-                Ce que vous allez apprendre
+                Detail texte
               </h2>
-              <div className="prose max-w-none">
+              {formation.content ? (
                 <div
-                  dangerouslySetInnerHTML={{ __html: formation.content || "" }}
+                  className="prose prose-slate max-w-none text-slate-800 [&_*]:!text-slate-800 [&_h1]:!text-slate-900 [&_h2]:!text-slate-900 [&_h3]:!text-slate-900 [&_h4]:!text-slate-900 [&_a]:!text-amber-700 [&_a]:underline [&_strong]:!text-slate-900"
+                  dangerouslySetInnerHTML={{ __html: formation.content }}
                 />
-              </div>
+              ) : (
+                <p className="text-slate-600 whitespace-pre-line">
+                  {formation.description}
+                </p>
+              )}
             </div>
           </TabsContent>
 
@@ -551,76 +432,90 @@ export default function FormationDetailPage() {
               <div className="flex items-center gap-4 mb-6">
                 <div className="text-center">
                   <p className="text-4xl font-bold text-slate-900">
-                    {formation.rating_avg}
+                    {Number(formation.rating_avg ?? 0).toFixed(1)}
                   </p>
                   <div className="flex items-center justify-center gap-1 my-1">
-                    {[...Array(5)].map((_, i) => (
+                    {[...Array(5)].map((_, index) => (
                       <Star
-                        key={i}
-                        className={`h-4 w-4 ${i < Math.floor(formation.rating_avg) ? "text-yellow-500 fill-yellow-500" : "text-slate-300"}`}
+                        key={index}
+                        className={`h-4 w-4 ${
+                          index < Math.floor(Number(formation.rating_avg ?? 0))
+                            ? "text-yellow-500 fill-yellow-500"
+                            : "text-slate-300"
+                        }`}
                       />
                     ))}
                   </div>
                   <p className="text-sm text-slate-500">
-                    {formation.enrolled_count} avis
+                    {formation.enrolled_count ?? 0} avis
                   </p>
                 </div>
               </div>
               <p className="text-slate-500 text-center">
-                Les avis seront bientôt disponibles...
+                Les avis detailles seront disponibles bientot.
               </p>
             </div>
           </TabsContent>
         </Tabs>
       </div>
 
-      {/* Related Formations */}
       <div className="bg-white border-t">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <h2 className="text-2xl font-bold text-slate-900 mb-6">
             Formations similaires
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {relatedFormations.map((relatedFormation, index) => (
-              <Card
-                key={relatedFormation.id}
-                className="overflow-hidden hover:shadow-lg transition-shadow"
-              >
-                <div className="relative aspect-video">
-                  <img
-                    src={
-                      relatedFormation.thumbnail_url ||
-                      "/images/placeholder-formation.jpg"
-                    }
-                    alt={relatedFormation.title}
-                    className="w-full h-full object-cover"
-                  />
-                  {relatedFormation.is_free ? (
-                    <Badge className="absolute top-3 left-3 bg-green-500">
-                      Gratuit
-                    </Badge>
-                  ) : (
-                    <Badge className="absolute top-3 left-3 bg-amber-500">
-                      {formatPrice(relatedFormation.price)}
-                    </Badge>
-                  )}
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-slate-900 mb-2 line-clamp-2">
-                    {relatedFormation.title}
-                  </h3>
-                  <p className="text-sm text-slate-600 line-clamp-2 mb-4">
-                    {relatedFormation.description}
-                  </p>
-                  <Link href={`/formations/${relatedFormation.slug}`}>
-                    <Button variant="outline" className="w-full">
-                      Voir les détails
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+
+          {relatedFormations.length === 0 ? (
+            <p className="text-slate-500">
+              Aucune formation similaire disponible.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {relatedFormations.map((relatedFormation) => (
+                <Card
+                  key={relatedFormation.id}
+                  className="overflow-hidden hover:shadow-lg transition-shadow"
+                >
+                  <div className="relative aspect-video">
+                    <Image
+                      src={
+                        relatedFormation.thumbnail_url ||
+                        "/images/placeholder-formation.jpg"
+                      }
+                      alt={relatedFormation.title}
+                      fill
+                      className="object-cover"
+                    />
+                    {relatedFormation.is_free ? (
+                      <Badge className="absolute top-3 left-3 bg-green-500">
+                        Gratuit
+                      </Badge>
+                    ) : (
+                      <Badge className="absolute top-3 left-3 bg-amber-500">
+                        {formatPrice(
+                          Number(relatedFormation.price) || 0,
+                          "USD",
+                        )}
+                      </Badge>
+                    )}
+                  </div>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-slate-900 mb-2 line-clamp-2">
+                      {relatedFormation.title}
+                    </h3>
+                    <p className="text-sm text-slate-600 line-clamp-2 mb-4">
+                      {relatedFormation.description}
+                    </p>
+                    <Link href={`/formations/${relatedFormation.slug}`}>
+                      <Button variant="outline" className="w-full">
+                        Voir les details
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

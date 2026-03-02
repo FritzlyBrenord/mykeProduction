@@ -32,7 +32,7 @@ export default function ProductCard({ produit, index = 0 }: ProductCardProps) {
         quantity: 1,
       });
       toast.success('Produit ajouté au panier');
-    } catch (error) {
+    } catch {
       toast.error('Erreur lors de l\'ajout au panier');
     }
   };

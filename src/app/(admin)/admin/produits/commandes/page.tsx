@@ -1,197 +1,308 @@
 'use client';
 
-import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { formatDateTime, formatPrice } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import {
-  Search,
-  Filter,
-  Package,
-  Truck,
+  AlertCircle,
   CheckCircle,
-  XCircle,
-  RotateCcw,
-  Eye,
-  Download,
   CreditCard,
-  Calendar,
+  Eye,
+  FlaskConical,
+  PlayCircle,
+  Search,
+  Truck,
   User,
+  XCircle,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { formatPrice, formatDateTime, getStatusColor, getStatusLabel } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
-};
+interface AdminOrderItem {
+  id: string;
+  item_type: 'produit' | 'formation' | 'video';
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  produit: {
+    name: string | null;
+    slug: string | null;
+    is_digital: boolean | null;
+    type: 'chimique' | 'document' | 'autre' | null;
+  } | null;
+  formation: { title: string | null; slug: string | null } | null;
+  video: { title: string | null; slug: string | null } | null;
+}
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0 },
-};
+interface AdminOrder {
+  id: string;
+  status: string;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  currency: string;
+  payment_method: string | null;
+  shipping_address: Record<string, unknown> | null;
+  created_at: string;
+  user: { full_name: string | null } | null;
+  items: AdminOrderItem[];
+}
 
-// Mock data
-const mockCommandes = [
-  {
-    id: 'CMD-2026-0001',
-    user: { full_name: 'Jean Dupont', email: 'jean@example.com' },
-    status: 'paid',
-    subtotal: 299.99,
-    discount_amount: 0,
-    tax_amount: 29.99,
-    total_amount: 329.98,
-    currency: 'USD',
-    payment_method: 'stripe',
-    items: [
-      { name: 'Acide sulfurique 95%', quantity: 2, unit_price: 99.99 },
-      { name: 'Guide de sécurité', quantity: 1, unit_price: 99.99 },
-    ],
-    created_at: '2026-02-24T10:30:00Z',
-  },
-  {
-    id: 'CMD-2026-0002',
-    user: { full_name: 'Marie Martin', email: 'marie@example.com' },
-    status: 'processing',
-    subtotal: 149.99,
-    discount_amount: 15,
-    tax_amount: 13.5,
-    total_amount: 148.49,
-    currency: 'USD',
-    payment_method: 'paypal',
-    items: [
-      { name: 'Éthanol absolu', quantity: 1, unit_price: 89.99 },
-      { name: 'Bécher 500ml', quantity: 5, unit_price: 12 },
-    ],
-    created_at: '2026-02-24T14:15:00Z',
-  },
-  {
-    id: 'CMD-2026-0003',
-    user: { full_name: 'Pierre Bernard', email: 'pierre@example.com' },
-    status: 'shipped',
-    subtotal: 599.99,
-    discount_amount: 60,
-    tax_amount: 54,
-    total_amount: 593.99,
-    currency: 'USD',
-    payment_method: 'stripe',
-    items: [
-      { name: 'Pack chimie complète', quantity: 1, unit_price: 599.99 },
-    ],
-    created_at: '2026-02-23T09:00:00Z',
-  },
-  {
-    id: 'CMD-2026-0004',
-    user: { full_name: 'Sophie Petit', email: 'sophie@example.com' },
-    status: 'pending',
-    subtotal: 89.99,
-    discount_amount: 0,
-    tax_amount: 9,
-    total_amount: 98.99,
-    currency: 'USD',
-    payment_method: null,
-    items: [
-      { name: 'Formation sécurité labo', quantity: 1, unit_price: 89.99 },
-    ],
-    created_at: '2026-02-23T16:45:00Z',
-  },
-  {
-    id: 'CMD-2026-0005',
-    user: { full_name: 'Lucas Moreau', email: 'lucas@example.com' },
-    status: 'delivered',
-    subtotal: 449.99,
-    discount_amount: 45,
-    tax_amount: 40.5,
-    total_amount: 445.49,
-    currency: 'USD',
-    payment_method: 'paypal',
-    items: [
-      { name: 'Microscope électronique', quantity: 1, unit_price: 449.99 },
-    ],
-    created_at: '2026-02-22T11:20:00Z',
-  },
-];
+function shippingField(order: AdminOrder, key: string) {
+  const value = order.shipping_address?.[key];
+  return typeof value === 'string' ? value : '';
+}
 
-const statusFlow = ['pending', 'paid', 'processing', 'shipped', 'delivered'];
+function getCustomerName(order: AdminOrder) {
+  const shippingName = `${shippingField(order, 'first_name')} ${shippingField(order, 'last_name')}`.trim();
+  return shippingName || order.user?.full_name || 'Client';
+}
+
+function getItemName(item: AdminOrderItem) {
+  if (item.item_type === 'produit') return item.produit?.name || 'Produit';
+  if (item.item_type === 'formation') return item.formation?.title || 'Formation';
+  return item.video?.title || 'Video';
+}
+
+function getStatusLabel(status: string) {
+  switch (status) {
+    case 'pending':
+      return 'En attente';
+    case 'paid':
+      return 'Payee';
+    case 'processing':
+      return 'En traitement';
+    case 'shipped':
+      return 'Expediee';
+    case 'delivered':
+      return 'Livree';
+    case 'cancelled':
+      return 'Annulee';
+    case 'refunded':
+      return 'Remboursee';
+    default:
+      return status;
+  }
+}
+
+function getStatusClass(status: string) {
+  switch (status) {
+    case 'paid':
+      return 'bg-blue-500/10 text-blue-700 border-blue-300';
+    case 'processing':
+      return 'bg-amber-500/10 text-amber-700 border-amber-300';
+    case 'shipped':
+      return 'bg-indigo-500/10 text-indigo-700 border-indigo-300';
+    case 'delivered':
+      return 'bg-green-500/10 text-green-700 border-green-300';
+    case 'cancelled':
+      return 'bg-red-500/10 text-red-700 border-red-300';
+    default:
+      return 'bg-slate-500/10 text-slate-700 border-slate-300';
+  }
+}
+
+function itemTypeBadge(item: AdminOrderItem) {
+  if (item.item_type === 'formation') {
+    return 'bg-blue-100 text-blue-700 border border-blue-200';
+  }
+  if (item.item_type === 'video') {
+    return 'bg-purple-100 text-purple-700 border border-purple-200';
+  }
+  if (item.produit?.type === 'chimique') {
+    return 'bg-amber-100 text-amber-800 border border-amber-200';
+  }
+  return 'bg-slate-100 text-slate-700 border border-slate-200';
+}
+
+function itemTypeLabel(item: AdminOrderItem) {
+  if (item.item_type === 'formation') return 'Formation';
+  if (item.item_type === 'video') return 'Video';
+  if (item.produit?.type === 'chimique') return 'Produit chimique';
+  return 'Produit';
+}
+
+function isFormationOrder(order: AdminOrder) {
+  return order.items?.some((item) => item.item_type === 'formation');
+}
+
+function isChemicalPhysicalOrder(order: AdminOrder) {
+  return order.items?.some(
+    (item) =>
+      item.item_type === 'produit' &&
+      item.produit?.type === 'chimique' &&
+      item.produit?.is_digital === false,
+  );
+}
+
+function nextChemicalStatus(status: string) {
+  if (status === 'paid') return 'processing';
+  if (status === 'processing') return 'shipped';
+  if (status === 'shipped') return 'delivered';
+  return null;
+}
+
+function nextChemicalStatusLabel(status: string) {
+  if (status === 'processing') return 'Mettre en traitement';
+  if (status === 'shipped') return 'Marquer expediee';
+  if (status === 'delivered') return 'Marquer livree';
+  return null;
+}
 
 export default function CommandesPage() {
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [selectedCommande, setSelectedCommande] = useState<typeof mockCommandes[0] | null>(null);
-  
-  const filteredCommandes = mockCommandes.filter((cmd) => {
-    if (statusFilter && cmd.status !== statusFilter) return false;
-    if (search && !cmd.id.toLowerCase().includes(search.toLowerCase()) && 
-        !cmd.user.full_name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const [statusFilter, setStatusFilter] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
+  const [actionLoadingOrderId, setActionLoadingOrderId] = useState<string | null>(null);
 
-  const stats = {
-    total: mockCommandes.length,
-    pending: mockCommandes.filter((c) => c.status === 'pending').length,
-    paid: mockCommandes.filter((c) => c.status === 'paid').length,
-    processing: mockCommandes.filter((c) => c.status === 'processing').length,
-    shipped: mockCommandes.filter((c) => c.status === 'shipped').length,
-    delivered: mockCommandes.filter((c) => c.status === 'delivered').length,
-    revenue: mockCommandes.reduce((acc, c) => acc + c.total_amount, 0),
+  useEffect(() => {
+    let active = true;
+    const loadOrders = async () => {
+      try {
+        setLoading(true);
+        const query = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : '';
+        const response = await fetch(`/api/admin/commandes${query}`, {
+          credentials: 'include',
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || 'Erreur chargement commandes');
+        if (!active) return;
+        setOrders(Array.isArray(data) ? (data as AdminOrder[]) : []);
+      } catch (error) {
+        console.error('Admin orders load error:', error);
+        toast.error("Impossible de recuperer les commandes.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    loadOrders();
+    return () => {
+      active = false;
+    };
+  }, [statusFilter]);
+
+  const filteredOrders = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return orders;
+    return orders.filter((order) => {
+      const customerName = getCustomerName(order).toLowerCase();
+      const customerEmail = shippingField(order, 'email').toLowerCase();
+      const hasItemMatch = (order.items || []).some((item) =>
+        getItemName(item).toLowerCase().includes(query),
+      );
+      return (
+        order.id.toLowerCase().includes(query) ||
+        customerName.includes(query) ||
+        customerEmail.includes(query) ||
+        hasItemMatch
+      );
+    });
+  }, [orders, search]);
+
+  const stats = useMemo(
+    () => ({
+      total: orders.length,
+      paid: orders.filter((order) => order.status === 'paid').length,
+      processing: orders.filter((order) => order.status === 'processing').length,
+      delivered: orders.filter((order) => order.status === 'delivered').length,
+      revenue: orders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0),
+    }),
+    [orders],
+  );
+
+  const refreshOrders = async () => {
+    const query = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : '';
+    const response = await fetch(`/api/admin/commandes${query}`, {
+      credentials: 'include',
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error || 'Erreur chargement commandes');
+    setOrders(Array.isArray(data) ? (data as AdminOrder[]) : []);
   };
 
-  const canAdvanceStatus = (currentStatus: string) => {
-    const currentIndex = statusFlow.indexOf(currentStatus);
-    return currentIndex < statusFlow.length - 1 ? statusFlow[currentIndex + 1] : null;
+  const updateStatus = async (orderId: string, status: string) => {
+    try {
+      setActionLoadingOrderId(orderId);
+      const response = await fetch(`/api/admin/commandes/${orderId}/status`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'Echec mise a jour');
+      await refreshOrders();
+      toast.success('Statut commande mis a jour.');
+    } catch (error) {
+      console.error('Status update error:', error);
+      toast.error("Impossible de modifier le statut.");
+    } finally {
+      setActionLoadingOrderId(null);
+    }
+  };
+
+  const authorizeOrder = async (orderId: string) => {
+    try {
+      setActionLoadingOrderId(orderId);
+      const response = await fetch(`/api/admin/commandes/${orderId}/status`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authorize: true }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Echec de l'autorisation");
+      await refreshOrders();
+      toast.success(data?.message || 'Formation autorisee et email envoye.');
+    } catch (error) {
+      console.error('Authorize order error:', error);
+      toast.error("Impossible d'autoriser la formation.");
+    } finally {
+      setActionLoadingOrderId(null);
+    }
   };
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6"
-    >
-      {/* Header */}
-      <motion.div variants={itemVariants}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <div>
         <h1 className="text-3xl font-bold text-[var(--foreground)]">Commandes</h1>
-        <p className="text-[var(--muted)] mt-1">Gérez les commandes et leur statut</p>
-      </motion.div>
+        <p className="text-[var(--muted)] mt-1">
+          Visualisez exactement ce qui a ete vendu et traitez les commandes par type d&apos;article.
+        </p>
+      </div>
 
-      {/* Stats */}
-      <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
           <p className="text-sm text-[var(--muted)]">Total</p>
           <p className="text-2xl font-bold text-[var(--foreground)]">{stats.total}</p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
-          <p className="text-sm text-[var(--muted)]">En attente</p>
-          <p className="text-2xl font-bold text-yellow-500">{stats.pending}</p>
+          <p className="text-sm text-[var(--muted)]">Payees</p>
+          <p className="text-2xl font-bold text-blue-600">{stats.paid}</p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
-          <p className="text-sm text-[var(--muted)]">Payées</p>
-          <p className="text-2xl font-bold text-green-500">{stats.paid}</p>
+          <p className="text-sm text-[var(--muted)]">Traitement</p>
+          <p className="text-2xl font-bold text-amber-600">{stats.processing}</p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
-          <p className="text-sm text-[var(--muted)]">En traitement</p>
-          <p className="text-2xl font-bold text-blue-500">{stats.processing}</p>
-        </div>
-        <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
-          <p className="text-sm text-[var(--muted)]">Expédiées</p>
-          <p className="text-2xl font-bold text-purple-500">{stats.shipped}</p>
-        </div>
-        <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
-          <p className="text-sm text-[var(--muted)]">Livrées</p>
-          <p className="text-2xl font-bold text-emerald-500">{stats.delivered}</p>
+          <p className="text-sm text-[var(--muted)]">Livrees</p>
+          <p className="text-2xl font-bold text-green-600">{stats.delivered}</p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
           <p className="text-sm text-[var(--muted)]">Revenus</p>
-          <p className="text-xl font-bold text-[var(--primary)]">{formatPrice(stats.revenue)}</p>
+          <p className="text-xl font-bold text-[var(--primary)]">{formatPrice(stats.revenue, 'USD')}</p>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Filters */}
-      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" />
           <input
             type="text"
-            placeholder="Rechercher une commande..."
+            placeholder="Rechercher commande, client, produit, formation..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
@@ -204,200 +315,259 @@ export default function CommandesPage() {
         >
           <option value="">Tous les statuts</option>
           <option value="pending">En attente</option>
-          <option value="paid">Payée</option>
+          <option value="paid">Payee</option>
           <option value="processing">En traitement</option>
-          <option value="shipped">Expédiée</option>
-          <option value="delivered">Livrée</option>
-          <option value="cancelled">Annulée</option>
-          <option value="refunded">Remboursée</option>
+          <option value="shipped">Expediee</option>
+          <option value="delivered">Livree</option>
+          <option value="cancelled">Annulee</option>
+          <option value="refunded">Remboursee</option>
         </select>
-      </motion.div>
+      </div>
 
-      {/* Commandes Table */}
-      <motion.div variants={itemVariants} className="bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden">
+      <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--background)]">
                 <th className="text-left py-4 px-6 text-sm font-medium text-[var(--muted)]">Commande</th>
                 <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">Client</th>
-                <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">Statut</th>
+                <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">Contenu vendu</th>
                 <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">Paiement</th>
+                <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">Statut</th>
                 <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">Total</th>
-                <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">Date</th>
                 <th className="text-right py-4 px-6 text-sm font-medium text-[var(--muted)]">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredCommandes.map((commande) => (
-                <tr key={commande.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]/50 transition-colors">
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-lg flex items-center justify-center">
-                        <Package className="w-5 h-5 text-[var(--primary)]" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-[var(--foreground)]">{commande.id}</p>
-                        <p className="text-xs text-[var(--muted)]">{commande.items.length} article(s)</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-[var(--muted)]" />
-                      <div>
-                        <p className="text-sm text-[var(--foreground)]">{commande.user.full_name}</p>
-                        <p className="text-xs text-[var(--muted)]">{commande.user.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className={cn('px-2 py-1 rounded-full text-xs font-medium border', getStatusColor(commande.status))}>
-                      {getStatusLabel(commande.status)}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    {commande.payment_method ? (
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="w-4 h-4 text-[var(--muted)]" />
-                        <span className="text-sm text-[var(--foreground)] capitalize">
-                          {commande.payment_method}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-[var(--muted)]">-</span>
-                    )}
-                  </td>
-                  <td className="py-4 px-4">
-                    <p className="font-medium text-[var(--foreground)]">
-                      {formatPrice(commande.total_amount)}
-                    </p>
-                    {commande.discount_amount > 0 && (
-                      <p className="text-xs text-green-500">
-                        -{formatPrice(commande.discount_amount)}
-                      </p>
-                    )}
-                  </td>
-                  <td className="py-4 px-4 text-sm text-[var(--muted)]">
-                    {formatDateTime(commande.created_at)}
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setSelectedCommande(commande)}
-                        className="p-2 hover:bg-[var(--background)] rounded-lg transition-colors"
-                        title="Voir détails"
-                      >
-                        <Eye className="w-4 h-4 text-[var(--muted)]" />
-                      </button>
-                      {canAdvanceStatus(commande.status) && (
-                        <button
-                          className="p-2 hover:bg-green-500/10 rounded-lg transition-colors"
-                          title="Avancer le statut"
-                        >
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                        </button>
-                      )}
-                      <button
-                        className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
-                        title="Annuler"
-                      >
-                        <XCircle className="w-4 h-4 text-red-500" />
-                      </button>
-                    </div>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="py-8 px-6 text-center text-[var(--muted)]">
+                    Chargement des commandes...
                   </td>
                 </tr>
-              ))}
+              ) : filteredOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 px-6 text-center text-[var(--muted)]">
+                    Aucune commande trouvee.
+                  </td>
+                </tr>
+              ) : (
+                filteredOrders.map((order) => {
+                  const customerName = getCustomerName(order);
+                  const customerEmail = shippingField(order, 'email');
+                  const hasFormation = isFormationOrder(order);
+                  const hasChemicalPhysical = isChemicalPhysicalOrder(order);
+                  const nextStatus = hasChemicalPhysical ? nextChemicalStatus(order.status) : null;
+                  const nextStatusText = nextStatus ? nextChemicalStatusLabel(nextStatus) : null;
+                  const isBusy = actionLoadingOrderId === order.id;
+
+                  return (
+                    <tr key={order.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]/50">
+                      <td className="py-4 px-6 align-top">
+                        <p className="font-medium text-[var(--foreground)] break-all">{order.id}</p>
+                        <p className="text-xs text-[var(--muted)]">{formatDateTime(order.created_at)}</p>
+                      </td>
+
+                      <td className="py-4 px-4 align-top">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-[var(--muted)] mt-0.5" />
+                          <div>
+                            <p className="text-sm text-[var(--foreground)]">{customerName}</p>
+                            <p className="text-xs text-[var(--muted)] break-all">{customerEmail || '-'}</p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-4 px-4 align-top">
+                        <div className="space-y-2">
+                          {(order.items || []).slice(0, 2).map((item) => (
+                            <div key={item.id} className="text-xs">
+                              <span className={`inline-flex px-2 py-0.5 rounded-full ${itemTypeBadge(item)}`}>
+                                {itemTypeLabel(item)}
+                              </span>
+                              <p className="mt-1 text-[var(--foreground)]">
+                                {getItemName(item)} x{item.quantity}
+                              </p>
+                            </div>
+                          ))}
+                          {(order.items || []).length > 2 && (
+                            <p className="text-xs text-[var(--muted)]">
+                              +{(order.items || []).length - 2} autre(s)
+                            </p>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="py-4 px-4 align-top">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-[var(--muted)]" />
+                          <div>
+                            <p className="text-sm text-[var(--foreground)] capitalize">
+                              {order.payment_method || '-'}
+                            </p>
+                            <p className="text-xs text-green-700 font-medium">Paiement confirme</p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-4 px-4 align-top">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusClass(order.status)}`}>
+                          {getStatusLabel(order.status)}
+                        </span>
+                      </td>
+
+                      <td className="py-4 px-4 align-top">
+                        <p className="font-medium text-[var(--foreground)]">
+                          {formatPrice(order.total_amount, order.currency || 'USD')}
+                        </p>
+                      </td>
+
+                      <td className="py-4 px-6 align-top">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <button
+                            onClick={() => setSelectedOrder(order)}
+                            className="p-2 hover:bg-[var(--background)] rounded-lg transition-colors"
+                            title="Voir details"
+                          >
+                            <Eye className="w-4 h-4 text-[var(--muted)]" />
+                          </button>
+
+                          {hasFormation && ['paid', 'processing'].includes(order.status) && (
+                            <Button
+                              size="sm"
+                              onClick={() => authorizeOrder(order.id)}
+                              disabled={isBusy}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Autoriser
+                            </Button>
+                          )}
+
+                          {hasChemicalPhysical && nextStatus && nextStatusText && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateStatus(order.id, nextStatus)}
+                              disabled={isBusy}
+                            >
+                              {nextStatusText}
+                            </Button>
+                          )}
+
+                          {(order.status === 'paid' || order.status === 'pending') && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => updateStatus(order.id, 'cancelled')}
+                              disabled={isBusy}
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Annuler
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Commande Detail Modal */}
-      {selectedCommande && (
+      {selectedOrder && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-[var(--card)] rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-auto"
+            className="bg-[var(--card)] rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-auto"
           >
             <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-[var(--foreground)]">{selectedCommande.id}</h2>
-                <p className="text-sm text-[var(--muted)]">{formatDateTime(selectedCommande.created_at)}</p>
+                <h2 className="text-xl font-bold text-[var(--foreground)] break-all">{selectedOrder.id}</h2>
+                <p className="text-sm text-[var(--muted)]">{formatDateTime(selectedOrder.created_at)}</p>
               </div>
               <button
-                onClick={() => setSelectedCommande(null)}
+                onClick={() => setSelectedOrder(null)}
                 className="p-2 hover:bg-[var(--background)] rounded-lg transition-colors"
               >
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="p-6 space-y-6">
-              {/* Client Info */}
-              <div>
-                <h3 className="text-sm font-medium text-[var(--muted)] mb-2">Client</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-[var(--background)] rounded-xl p-4">
-                  <p className="font-medium text-[var(--foreground)]">{selectedCommande.user.full_name}</p>
-                  <p className="text-sm text-[var(--muted)]">{selectedCommande.user.email}</p>
+                  <p className="text-sm text-[var(--muted)] mb-1">Client</p>
+                  <p className="font-medium text-[var(--foreground)]">{getCustomerName(selectedOrder)}</p>
+                  <p className="text-sm text-[var(--muted)]">{shippingField(selectedOrder, 'email') || '-'}</p>
+                </div>
+
+                <div className="bg-[var(--background)] rounded-xl p-4">
+                  <p className="text-sm text-[var(--muted)] mb-1">Statut</p>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusClass(selectedOrder.status)}`}>
+                    {getStatusLabel(selectedOrder.status)}
+                  </span>
+                  <p className="text-sm text-green-700 mt-2">Paiement confirme</p>
                 </div>
               </div>
-              
-              {/* Items */}
+
               <div>
-                <h3 className="text-sm font-medium text-[var(--muted)] mb-2">Articles</h3>
+                <h3 className="text-sm font-medium text-[var(--muted)] mb-2">Details des articles vendus</h3>
                 <div className="space-y-2">
-                  {selectedCommande.items.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between bg-[var(--background)] rounded-xl p-4">
-                      <div>
-                        <p className="font-medium text-[var(--foreground)]">{item.name}</p>
-                        <p className="text-sm text-[var(--muted)]">Qté: {item.quantity}</p>
+                  {(selectedOrder.items || []).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between bg-[var(--background)] rounded-xl p-4 gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs ${itemTypeBadge(item)}`}>
+                            {itemTypeLabel(item)}
+                          </span>
+                          {item.item_type === 'produit' && item.produit?.type === 'chimique' && (
+                            <FlaskConical className="w-4 h-4 text-amber-700" />
+                          )}
+                          {item.item_type === 'formation' && <PlayCircle className="w-4 h-4 text-blue-700" />}
+                          {item.item_type === 'produit' && !item.produit?.is_digital && <Truck className="w-4 h-4 text-indigo-700" />}
+                        </div>
+                        <p className="font-medium text-[var(--foreground)] mt-1 truncate">{getItemName(item)}</p>
+                        <p className="text-sm text-[var(--muted)]">Quantite: {item.quantity}</p>
                       </div>
-                      <p className="font-medium text-[var(--foreground)]">
-                        {formatPrice(item.unit_price * item.quantity)}
+                      <p className="font-medium text-[var(--foreground)] shrink-0">
+                        {formatPrice(item.total_price, selectedOrder.currency || 'USD')}
                       </p>
                     </div>
                   ))}
                 </div>
               </div>
-              
-              {/* Totals */}
-              <div className="border-t border-[var(--border)] pt-4">
-                <div className="space-y-2">
+
+              <div className="border-t border-[var(--border)] pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--muted)]">Sous-total</span>
+                  <span className="text-[var(--foreground)]">{formatPrice(selectedOrder.subtotal, selectedOrder.currency || 'USD')}</span>
+                </div>
+                {selectedOrder.discount_amount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-[var(--muted)]">Sous-total</span>
-                    <span className="text-[var(--foreground)]">{formatPrice(selectedCommande.subtotal)}</span>
+                    <span className="text-green-600">Remise</span>
+                    <span className="text-green-600">-{formatPrice(selectedOrder.discount_amount, selectedOrder.currency || 'USD')}</span>
                   </div>
-                  {selectedCommande.discount_amount > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-green-500">Remise</span>
-                      <span className="text-green-500">-{formatPrice(selectedCommande.discount_amount)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--muted)]">Taxes</span>
-                    <span className="text-[var(--foreground)]">{formatPrice(selectedCommande.tax_amount)}</span>
-                  </div>
-                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-[var(--border)]">
-                    <span className="text-[var(--foreground)]">Total</span>
-                    <span className="text-[var(--primary)]">{formatPrice(selectedCommande.total_amount)}</span>
-                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--muted)]">Taxes</span>
+                  <span className="text-[var(--foreground)]">{formatPrice(selectedOrder.tax_amount, selectedOrder.currency || 'USD')}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t border-[var(--border)]">
+                  <span className="text-[var(--foreground)]">Total</span>
+                  <span className="text-[var(--primary)]">{formatPrice(selectedOrder.total_amount, selectedOrder.currency || 'USD')}</span>
                 </div>
               </div>
-              
-              {/* Actions */}
-              <div className="flex gap-3">
-                <Button className="flex-1 gap-2">
-                  <Download className="w-4 h-4" />
-                  Facture
-                </Button>
-                {canAdvanceStatus(selectedCommande.status) && (
-                  <Button variant="outline" className="flex-1 gap-2">
-                    <Truck className="w-4 h-4" />
-                    {getStatusLabel(canAdvanceStatus(selectedCommande.status)!)}
-                  </Button>
-                )}
+
+              <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <p>
+                  Regle metier appliquee: formation = bouton Autoriser; produit chimique physique = workflow
+                  traitement puis expedition puis livraison.
+                </p>
               </div>
             </div>
           </motion.div>

@@ -1,13 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Search, Filter, Sparkles, X } from "lucide-react";
-import { Formation } from "@/lib/types";
 import FormationCard from "@/components/cards/FormationCard";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -22,266 +18,234 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { Formation } from "@/lib/types";
+import { motion } from "framer-motion";
+import { Filter, Search, Sparkles, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-// Données mockées
-const mockFormations: Formation[] = [
-  {
-    id: "1",
-    title: "Introduction à la chimie industrielle",
-    slug: "introduction-chimie-industrielle",
-    description:
-      "Apprenez les bases de la chimie industrielle, des réactions chimiques aux procédés de fabrication.",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800",
-    price: 199,
-    is_free: false,
-    format: "video",
-    status: "published",
-    category_id: "1",
-    duration_hours: 12,
-    level: "debutant",
-    language: "fr",
-    certificate: true,
-    enrolled_count: 245,
-    rating_avg: 4.7,
-    created_at: "2024-01-15",
-    updated_at: "2024-01-15",
-    category: { id: "1", name: "Chimie", slug: "chimie", type: "formation" },
-  },
-  {
-    id: "2",
-    title: "Sécurité des procédés industriels",
-    slug: "securite-procedes-industriels",
-    description:
-      "Maîtrisez les normes de sécurité et les bonnes pratiques pour les environnements industriels.",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1581092921461-eab62e97a782?w=800",
-    price: 0,
-    is_free: true,
-    format: "text",
-    status: "published",
-    category_id: "2",
-    duration_hours: 8,
-    level: "intermediaire",
-    language: "fr",
-    certificate: true,
-    enrolled_count: 512,
-    rating_avg: 4.5,
-    created_at: "2024-02-01",
-    updated_at: "2024-02-01",
-    category: {
-      id: "2",
-      name: "Sécurité",
-      slug: "securite",
-      type: "formation",
-    },
-  },
-  {
-    id: "3",
-    title: "Gestion de la qualité ISO 9001",
-    slug: "gestion-qualite-iso-9001",
-    description:
-      "Implémentez un système de management de la qualité conforme à la norme ISO 9001.",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800",
-    price: 299,
-    is_free: false,
-    format: "video",
-    status: "published",
-    category_id: "3",
-    duration_hours: 20,
-    level: "avance",
-    language: "fr",
-    certificate: true,
-    enrolled_count: 189,
-    rating_avg: 4.8,
-    created_at: "2024-01-20",
-    updated_at: "2024-01-20",
-    category: { id: "3", name: "Qualité", slug: "qualite", type: "formation" },
-  },
-  {
-    id: "4",
-    title: "Automatisation industrielle avec PLC",
-    slug: "automatisation-plc",
-    description:
-      "Programmation et configuration des automates programmables industriels.",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1565514020176-db9e1b95da24?w=800",
-    price: 349,
-    is_free: false,
-    format: "video",
-    status: "published",
-    category_id: "4",
-    duration_hours: 25,
-    level: "intermediaire",
-    language: "fr",
-    certificate: true,
-    enrolled_count: 156,
-    rating_avg: 4.9,
-    created_at: "2024-02-10",
-    updated_at: "2024-02-10",
-    category: {
-      id: "4",
-      name: "Automatisation",
-      slug: "automatisation",
-      type: "formation",
-    },
-  },
-  {
-    id: "5",
-    title: "Hydrolyse acide : principes et applications",
-    slug: "hydrolyse-acide",
-    description:
-      "Comprendre les mécanismes d'hydrolyse acide et leurs applications industrielles.",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?w=800",
-    price: 149,
-    is_free: false,
-    format: "text",
-    status: "published",
-    category_id: "1",
-    duration_hours: 6,
-    level: "avance",
-    language: "fr",
-    certificate: false,
-    enrolled_count: 89,
-    rating_avg: 4.6,
-    created_at: "2024-02-15",
-    updated_at: "2024-02-15",
-    category: { id: "1", name: "Chimie", slug: "chimie", type: "formation" },
-  },
-  {
-    id: "6",
-    title: "Maintenance préventive des équipements",
-    slug: "maintenance-preventive",
-    description:
-      "Optimisez la disponibilité de vos équipements grâce à une maintenance préventive efficace.",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800",
-    price: 0,
-    is_free: true,
-    format: "video",
-    status: "published",
-    category_id: "5",
-    duration_hours: 10,
-    level: "debutant",
-    language: "fr",
-    certificate: true,
-    enrolled_count: 423,
-    rating_avg: 4.4,
-    created_at: "2024-01-25",
-    updated_at: "2024-01-25",
-    category: {
-      id: "5",
-      name: "Maintenance",
-      slug: "maintenance",
-      type: "formation",
-    },
-  },
-];
+const levels = ["Tous", "Debutant", "Intermediaire", "Avance"] as const;
+const formats = ["Tous", "Video", "Texte"] as const;
+const prices = ["Tous", "Gratuit", "Payant"] as const;
+const sortOptions = [
+  { value: "recent", label: "Plus recentes" },
+  { value: "popular", label: "Plus populaires" },
+  { value: "price-asc", label: "Prix croissant" },
+  { value: "price-desc", label: "Prix decroissant" },
+] as const;
 
-const categories = [
-  "Toutes",
-  "Chimie",
-  "Sécurité",
-  "Qualité",
-  "Automatisation",
-  "Maintenance",
-];
-const levels = ["Tous", "Débutant", "Intermédiaire", "Avancé"];
-const formats = ["Tous", "Vidéo", "Texte"];
-const prices = ["Tous", "Gratuit", "Payant"];
+function normalizeText(value: string | null | undefined) {
+  return (value ?? "").toLowerCase();
+}
 
 export default function FormationsPage() {
+  const [formations, setFormations] = useState<Formation[]>([]);
+  const [purchasedFormationIds, setPurchasedFormationIds] = useState<string[]>(
+    [],
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Toutes");
   const [selectedLevel, setSelectedLevel] = useState("Tous");
   const [selectedFormat, setSelectedFormat] = useState("Tous");
   const [selectedPrice, setSelectedPrice] = useState("Tous");
+  const [selectedSort, setSelectedSort] = useState<(typeof sortOptions)[number]["value"]>("recent");
 
-  const filteredFormations = mockFormations.filter((formation) => {
-    const matchesSearch =
-      formation.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      formation.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      selectedCategory === "Toutes" ||
-      formation.category?.name === selectedCategory;
-    const matchesLevel =
-      selectedLevel === "Tous" ||
-      (selectedLevel === "Débutant" && formation.level === "debutant") ||
-      (selectedLevel === "Intermédiaire" &&
-        formation.level === "intermediaire") ||
-      (selectedLevel === "Avancé" && formation.level === "avance");
-    const matchesFormat =
-      selectedFormat === "Tous" ||
-      (selectedFormat === "Vidéo" && formation.format === "video") ||
-      (selectedFormat === "Texte" && formation.format === "text");
-    const matchesPrice =
-      selectedPrice === "Tous" ||
-      (selectedPrice === "Gratuit" && formation.is_free) ||
-      (selectedPrice === "Payant" && !formation.is_free);
+  useEffect(() => {
+    let active = true;
 
-    return (
-      matchesSearch &&
-      matchesCategory &&
-      matchesLevel &&
-      matchesFormat &&
-      matchesPrice
-    );
-  });
+    const fetchFormations = async () => {
+      try {
+        setIsLoading(true);
+        setFetchError(null);
+
+        const [response, accountResponse] = await Promise.all([
+          fetch("/api/formations?limit=200", {
+            method: "GET",
+            cache: "no-store",
+          }),
+          fetch("/api/compte/formations", {
+            method: "GET",
+            cache: "no-store",
+          }),
+        ]);
+
+        if (!response.ok) {
+          throw new Error("Impossible de charger les formations publiees.");
+        }
+
+        const data = (await response.json()) as Formation[];
+        if (!active) return;
+        setFormations(Array.isArray(data) ? data : []);
+
+        if (accountResponse.ok) {
+          const accountData = (await accountResponse.json()) as {
+            enrollments?: Array<{ formation_id: string | null }>;
+          };
+          const ids = (accountData.enrollments ?? [])
+            .map((entry) => entry.formation_id)
+            .filter((id): id is string => Boolean(id));
+          setPurchasedFormationIds(ids);
+        } else if (accountResponse.status === 401) {
+          setPurchasedFormationIds([]);
+        }
+      } catch {
+        if (!active) return;
+        setFetchError("Impossible de recuperer les formations pour le moment.");
+        setFormations([]);
+        setPurchasedFormationIds([]);
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchFormations();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const categories = useMemo(() => {
+    const names = formations
+      .map((formation) => formation.category?.name ?? null)
+      .filter((name): name is string => Boolean(name));
+
+    const unique = Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+    return ["Toutes", ...unique];
+  }, [formations]);
+
+  const purchasedSet = useMemo(
+    () => new Set(purchasedFormationIds),
+    [purchasedFormationIds],
+  );
+
+  const filteredFormations = useMemo(() => {
+    const search = normalizeText(searchQuery.trim());
+    const filtered = formations.filter((formation) => {
+      const title = normalizeText(formation.title);
+      const description = normalizeText(formation.description);
+      const categoryName = formation.category?.name ?? "Toutes";
+
+      const matchesSearch = !search || title.includes(search) || description.includes(search);
+      const matchesCategory =
+        selectedCategory === "Toutes" || categoryName === selectedCategory;
+      const matchesLevel =
+        selectedLevel === "Tous" ||
+        (selectedLevel === "Debutant" && formation.level === "debutant") ||
+        (selectedLevel === "Intermediaire" && formation.level === "intermediaire") ||
+        (selectedLevel === "Avance" && formation.level === "avance");
+      const matchesFormat =
+        selectedFormat === "Tous" ||
+        (selectedFormat === "Video" && formation.format === "video") ||
+        (selectedFormat === "Texte" && formation.format === "text");
+      const matchesPrice =
+        selectedPrice === "Tous" ||
+        (selectedPrice === "Gratuit" && formation.is_free) ||
+        (selectedPrice === "Payant" && !formation.is_free);
+
+      return (
+        matchesSearch &&
+        matchesCategory &&
+        matchesLevel &&
+        matchesFormat &&
+        matchesPrice
+      );
+    });
+
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      if (selectedSort === "popular") {
+        return (b.enrolled_count ?? 0) - (a.enrolled_count ?? 0);
+      }
+
+      if (selectedSort === "price-asc") {
+        return Number(a.price ?? 0) - Number(b.price ?? 0);
+      }
+
+      if (selectedSort === "price-desc") {
+        return Number(b.price ?? 0) - Number(a.price ?? 0);
+      }
+
+      return (
+        new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+      );
+    });
+
+    return sorted;
+  }, [
+    formations,
+    searchQuery,
+    selectedCategory,
+    selectedLevel,
+    selectedFormat,
+    selectedPrice,
+    selectedSort,
+  ]);
 
   const hasActiveFilters =
     selectedCategory !== "Toutes" ||
     selectedLevel !== "Tous" ||
     selectedFormat !== "Tous" ||
-    selectedPrice !== "Tous";
+    selectedPrice !== "Tous" ||
+    searchQuery.trim().length > 0;
 
   const clearFilters = () => {
     setSelectedCategory("Toutes");
     setSelectedLevel("Tous");
     setSelectedFormat("Tous");
     setSelectedPrice("Tous");
+    setSelectedSort("recent");
     setSearchQuery("");
   };
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="flex items-center gap-2 text-amber-600 mb-2">
               <Sparkles className="h-5 w-5" />
-              <span className="font-medium uppercase tracking-wider text-sm">
-                Catalogue
-              </span>
+              <span className="font-medium uppercase tracking-wider text-sm">Catalogue</span>
             </div>
             <h1 className="font-[family-name:var(--font-playfair)] text-4xl lg:text-5xl font-semibold text-slate-900">
               Nos formations
             </h1>
             <p className="text-slate-600 mt-3 max-w-2xl text-lg">
-              Découvrez notre catalogue de formations professionnelles pour
-              développer vos compétences industrielles.
+              Retrouvez uniquement les formations publiees et accessibles au public.
             </p>
           </motion.div>
         </div>
       </div>
 
-      {/* Filters & Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search & Mobile Filter */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Rechercher une formation..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(event) => setSearchQuery(event.target.value)}
               className="pl-10 border border-slate-300 text-slate-900"
             />
+          </div>
+
+          <div className="w-full sm:w-60">
+            <Select value={selectedSort} onValueChange={(value) => setSelectedSort(value as typeof selectedSort)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Trier par" />
+              </SelectTrigger>
+              <SelectContent>
+                {sortOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <Sheet>
@@ -297,13 +261,8 @@ export default function FormationsPage() {
               </SheetHeader>
               <div className="space-y-4 mt-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Catégorie
-                  </label>
-                  <Select
-                    value={selectedCategory}
-                    onValueChange={setSelectedCategory}
-                  >
+                  <label className="text-sm font-medium mb-2 block">Categorie</label>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -317,13 +276,8 @@ export default function FormationsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Niveau
-                  </label>
-                  <Select
-                    value={selectedLevel}
-                    onValueChange={setSelectedLevel}
-                  >
+                  <label className="text-sm font-medium mb-2 block">Niveau</label>
+                  <Select value={selectedLevel} onValueChange={setSelectedLevel}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -337,13 +291,8 @@ export default function FormationsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Format
-                  </label>
-                  <Select
-                    value={selectedFormat}
-                    onValueChange={setSelectedFormat}
-                  >
+                  <label className="text-sm font-medium mb-2 block">Format</label>
+                  <Select value={selectedFormat} onValueChange={setSelectedFormat}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -358,10 +307,7 @@ export default function FormationsPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Prix</label>
-                  <Select
-                    value={selectedPrice}
-                    onValueChange={setSelectedPrice}
-                  >
+                  <Select value={selectedPrice} onValueChange={setSelectedPrice}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -380,11 +326,10 @@ export default function FormationsPage() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Desktop Sidebar Filters */}
           <div className="hidden lg:block w-64 flex-shrink-0">
             <div className="bg-white rounded-lg shadow-sm border p-6 space-y-6">
               <div>
-                <h3 className="font-semibold text-slate-900 mb-3">Catégorie</h3>
+                <h3 className="font-semibold text-slate-900 mb-3">Categorie</h3>
                 <div className="space-y-2">
                   {categories.map((cat) => (
                     <button
@@ -461,9 +406,7 @@ export default function FormationsPage() {
             </div>
           </div>
 
-          {/* Results */}
           <div className="flex-1">
-            {/* Active Filters */}
             {hasActiveFilters && (
               <div className="flex items-center gap-2 mb-4 flex-wrap">
                 <span className="text-sm text-slate-500">Filtres actifs:</span>
@@ -479,74 +422,71 @@ export default function FormationsPage() {
                 {selectedLevel !== "Tous" && (
                   <Badge variant="secondary" className="gap-1">
                     {selectedLevel}
-                    <X
-                      className="h-3 w-3 cursor-pointer"
-                      onClick={() => setSelectedLevel("Tous")}
-                    />
+                    <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedLevel("Tous")} />
                   </Badge>
                 )}
                 {selectedFormat !== "Tous" && (
                   <Badge variant="secondary" className="gap-1">
                     {selectedFormat}
-                    <X
-                      className="h-3 w-3 cursor-pointer"
-                      onClick={() => setSelectedFormat("Tous")}
-                    />
+                    <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedFormat("Tous")} />
                   </Badge>
                 )}
                 {selectedPrice !== "Tous" && (
                   <Badge variant="secondary" className="gap-1">
                     {selectedPrice}
-                    <X
-                      className="h-3 w-3 cursor-pointer"
-                      onClick={() => setSelectedPrice("Tous")}
-                    />
+                    <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedPrice("Tous")} />
                   </Badge>
                 )}
-                <button
-                  onClick={clearFilters}
-                  className="text-sm text-amber-600 hover:text-amber-700"
-                >
+                <button onClick={clearFilters} className="text-sm text-amber-600 hover:text-amber-700">
                   Tout effacer
                 </button>
               </div>
             )}
 
-            {/* Results Count */}
-            <p className="text-sm text-slate-500 mb-4">
-              {filteredFormations.length} formation
-              {filteredFormations.length !== 1 ? "s" : ""} trouvée
-              {filteredFormations.length !== 1 ? "s" : ""}
-            </p>
-
-            {/* Grid */}
-            {filteredFormations.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filteredFormations.map((formation, index) => (
-                  <FormationCard
-                    key={formation.id}
-                    formation={formation}
-                    index={index}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Sparkles className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                <h3 className="font-[family-name:var(--font-playfair)] text-lg font-medium text-slate-900 mb-2">
-                  Aucune formation trouvée
-                </h3>
-                <p className="text-slate-500">
-                  Essayez de modifier vos filtres ou votre recherche
-                </p>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={clearFilters}
-                >
-                  Effacer les filtres
+            {isLoading ? (
+              <div className="text-center py-16 text-slate-500">Chargement des formations...</div>
+            ) : fetchError ? (
+              <div className="text-center py-16">
+                <h3 className="font-semibold text-slate-900 mb-2">Erreur de chargement</h3>
+                <p className="text-slate-500 mb-4">{fetchError}</p>
+                <Button variant="outline" onClick={() => window.location.reload()}>
+                  Reessayer
                 </Button>
               </div>
+            ) : (
+              <>
+                <p className="text-sm text-slate-500 mb-4">
+                  {filteredFormations.length} formation
+                  {filteredFormations.length !== 1 ? "s" : ""} trouvee
+                  {filteredFormations.length !== 1 ? "s" : ""}
+                </p>
+
+                {filteredFormations.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {filteredFormations.map((formation, index) => (
+                      <FormationCard
+                        key={formation.id}
+                        formation={formation}
+                        index={index}
+                        isPurchased={
+                          formation.is_free || purchasedSet.has(formation.id)
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Sparkles className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                    <h3 className="font-[family-name:var(--font-playfair)] text-lg font-medium text-slate-900 mb-2">
+                      Aucune formation trouvee
+                    </h3>
+                    <p className="text-slate-500">Essayez de modifier vos filtres ou votre recherche.</p>
+                    <Button variant="outline" className="mt-4" onClick={clearFilters}>
+                      Effacer les filtres
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

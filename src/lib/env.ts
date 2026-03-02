@@ -24,6 +24,8 @@ export const env = {
   NEXT_PUBLIC_SENTRY_DSN: readEnv("NEXT_PUBLIC_SENTRY_DSN"),
   RESEND_API_KEY: readEnv("RESEND_API_KEY"),
   EMAIL_FROM: readEnv("EMAIL_FROM"),
+  GMAIL_SMTP_USER: readEnv("GMAIL_SMTP_USER"),
+  GMAIL_SMTP_APP_PASSWORD: readEnv("GMAIL_SMTP_APP_PASSWORD"),
   ENCRYPTION_KEY: readEnv("ENCRYPTION_KEY"),
   NEXT_PUBLIC_APP_URL: readEnv("NEXT_PUBLIC_APP_URL"),
   NEXT_PUBLIC_APP_NAME: readEnv("NEXT_PUBLIC_APP_NAME") ?? "Myke Industrie",
@@ -54,4 +56,15 @@ export function getEncryptionKeyHex() {
   }
 
   return env.ENCRYPTION_KEY;
+}
+
+export function getGmailSmtpEnv() {
+  if (!env.GMAIL_SMTP_USER || !env.GMAIL_SMTP_APP_PASSWORD) {
+    throw new Error("Missing GMAIL_SMTP_USER or GMAIL_SMTP_APP_PASSWORD");
+  }
+
+  return {
+    user: env.GMAIL_SMTP_USER,
+    appPassword: env.GMAIL_SMTP_APP_PASSWORD,
+  };
 }

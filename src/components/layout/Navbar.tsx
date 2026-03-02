@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu,
@@ -42,6 +42,7 @@ export default function Navbar() {
   const [isPastHero, setIsPastHero] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const { user, signOut } = useAuth();
   const { itemCount } = useCart();
 
@@ -78,9 +79,11 @@ export default function Navbar() {
   const logoSubtitleClass = isLightMode
     ? "text-amber-600"
     : "text-amber-400/80";
-  const borderColorClass = isLightMode
-    ? "border-slate-200"
-    : "border-amber-400/10";
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/auth/connexion");
+    router.refresh();
+  };
 
   return (
     <motion.header
@@ -272,7 +275,7 @@ export default function Navbar() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-slate-700/50" />
                   <DropdownMenuItem
-                    onClick={() => signOut()}
+                    onClick={handleSignOut}
                     className="text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer py-2.5"
                   >
                     <LogOut className="mr-2 h-4 w-4" />

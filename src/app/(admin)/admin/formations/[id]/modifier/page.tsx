@@ -663,12 +663,12 @@ export default function ModifierFormationPage() {
 
                             {d.intro_type === "video" && (
                               <div className="space-y-1.5">
-                                <div className="grid grid-cols-2 gap-1">
-                                  {(["upload", "youtube"] as const).map((t) => (
+                                <div className="grid grid-cols-3 gap-1">
+                                  {(["upload", "youtube", "vimeo"] as const).map((t) => (
                                     <button key={t} onClick={() => setIntroDrafts((p) => ({ ...p, [m.id]: { ...d, intro_video_type: t as any } }))}
                                       className={cn("px-1.5 py-0.5 rounded text-[10px] border capitalize",
                                         d.intro_video_type === t ? "bg-[var(--primary)] text-white" : "border-[var(--border)]")}>
-                                      {t === "upload" ? "⬆ Vidéo" : "▶ YouTube"}
+                                      {t === "upload" ? "Upload" : t === "youtube" ? "YouTube" : "Vimeo"}
                                     </button>
                                   ))}
                                 </div>
@@ -689,7 +689,7 @@ export default function ModifierFormationPage() {
                                   </label>
                                 ) : (
                                   <input className="w-full px-2 py-1 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[10px]"
-                                    value={d.intro_video_url} placeholder="URL YouTube"
+                                    value={d.intro_video_url} placeholder={d.intro_video_type === "vimeo" ? "URL Vimeo" : "URL YouTube"}
                                     onChange={(e) => setIntroDrafts((p) => ({ ...p, [m.id]: { ...d, intro_video_url: e.target.value } }))} />
                                 )}
                               </div>
@@ -981,3 +981,4 @@ export default function ModifierFormationPage() {
     </div>
   );
 }
+
