@@ -58,23 +58,41 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { data, error } = await supabaseAdmin
+    const baseInsertData = {
+      title: body.title,
+      slug: body.slug,
+      excerpt: body.excerpt,
+      content: body.content,
+      thumbnail_url: body.thumbnail_url,
+      status: body.status || 'draft',
+      category_id: null,
+      seo_title: body.seo_title,
+      seo_description: body.seo_description,
+      allow_comments: body.allow_comments ?? true,
+      published_at: body.status === 'published' ? new Date().toISOString() : null,
+    };
+
+    let data: any = null;
+    let error: any = null;
+
+    // Backward-compatible insert:
+    // if migration 010 is not applied yet, retry without thumbnail_storage_path.
+    ({ data, error } = await supabaseAdmin
       .from('articles')
       .insert({
-        title: body.title,
-        slug: body.slug,
-        excerpt: body.excerpt,
-        content: body.content,
-        thumbnail_url: body.thumbnail_url,
-        status: body.status || 'draft',
-        category_id: null,
-        seo_title: body.seo_title,
-        seo_description: body.seo_description,
-        allow_comments: body.allow_comments ?? true,
-        published_at: body.status === 'published' ? new Date().toISOString() : null,
+        ...baseInsertData,
+        thumbnail_storage_path: body.thumbnail_storage_path || null,
       })
       .select()
-      .single();
+      .single());
+
+    if (error?.code === '42703') {
+      ({ data, error } = await supabaseAdmin
+        .from('articles')
+        .insert(baseInsertData)
+        .select()
+        .single());
+    }
 
     if (error) throw error;
 

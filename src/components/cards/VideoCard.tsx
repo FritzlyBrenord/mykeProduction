@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Play, Eye, Lock, Users, DollarSign } from "lucide-react";
 import { Video } from "@/lib/types";
 import { formatPrice } from "@/lib/utils/format";
+import { extractVimeoId, extractYouTubeId } from "@/lib/video-utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -14,7 +15,31 @@ interface VideoCardProps {
   index?: number;
 }
 
+function getVideoPreviewThumbnail(video: Video): string | null {
+  if (video.thumbnail_url) {
+    return video.thumbnail_url;
+  }
+
+  if (video.video_type === "youtube" && video.video_url) {
+    const videoId = extractYouTubeId(video.video_url);
+    if (videoId) {
+      return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    }
+  }
+
+  if (video.video_type === "vimeo" && video.video_url) {
+    const videoId = extractVimeoId(video.video_url);
+    if (videoId) {
+      return `https://vumbnail.com/${videoId}.jpg`;
+    }
+  }
+
+  return null;
+}
+
 export default function VideoCard({ video, index = 0 }: VideoCardProps) {
+  const previewThumbnail = getVideoPreviewThumbnail(video);
+
   const getAccessBadge = () => {
     switch (video.access_type) {
       case "public":
@@ -53,12 +78,29 @@ export default function VideoCard({ video, index = 0 }: VideoCardProps) {
         <Card className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-slate-200">
           {/* Thumbnail */}
           <div className="relative aspect-video overflow-hidden">
-            <Image
-              src={video.thumbnail_url || "/images/placeholder-video.jpg"}
-              alt={video.title}
-              fill
-              className="object-cover group-hover:scale-105 transition-transform duration-500"
-            />
+            {previewThumbnail ? (
+              <Image
+                src={previewThumbnail}
+                alt={video.title}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            ) : video.video_type === "upload" && video.video_url ? (
+              <video
+                src={video.video_url}
+                muted
+                playsInline
+                preload="metadata"
+                className="pointer-events-none h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            ) : (
+              <Image
+                src="/images/placeholder-video.svg"
+                alt={video.title}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            )}
 
             {/* Overlay */}
             <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors" />

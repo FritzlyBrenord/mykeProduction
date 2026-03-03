@@ -173,6 +173,7 @@ CREATE TABLE articles (
   excerpt         TEXT,
   content         TEXT NOT NULL,  -- HTML sanitisé via DOMPurify
   thumbnail_url   TEXT,
+  thumbnail_storage_path TEXT,
   status          TEXT DEFAULT 'draft'
                     CHECK (status IN ('draft','published','scheduled','archived')),
   category_id     UUID REFERENCES categories(id),

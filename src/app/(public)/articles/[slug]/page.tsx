@@ -1,337 +1,914 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Calendar,
+  ChevronDown,
+  ChevronRight,
   Clock,
-  User,
+  Eye,
   MessageCircle,
-  Share2,
-  Twitter,
-  Facebook,
-  Linkedin,
+  Reply,
   Send,
+  Sparkles,
   ThumbsUp,
 } from "lucide-react";
-import { Article, Commentaire } from "@/lib/types";
-import { formatDate } from "@/lib/utils/format";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Textarea } from "@/components/ui/textarea";
+import Image from "next/image";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import {
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/hooks/useAuth";
 
-const mockArticle: Article = {
-  id: "1",
-  title: "Les nouvelles réglementations REACH 2024 : ce qui change",
-  slug: "nouvelles-reglementations-reach-2024",
-  excerpt:
-    "Analyse des dernières modifications du règlement REACH et leur impact sur les industries chimiques européennes.",
-  content: `
-    <p>Le règlement REACH (Enregistrement, Évaluation et Autorisation des Produits Chimiques) constitue le cadre réglementaire principal de l'Union Européenne pour garantir la sécurité des produits chimiques. En 2024, plusieurs modifications importantes ont été apportées pour renforcer la protection de la santé humaine et de l'environnement.</p>
-    
-    <h2>Les principales modifications</h2>
-    
-    <p>Les nouvelles dispositions du REACH 2024 introduisent plusieurs changements significatifs :</p>
-    
-    <ul>
-      <li><strong>Restriction des substances dangereuses</strong> : Extension de la liste des substances soumises à autorisation</li>
-      <li><strong>Obligations de déclaration renforcées</strong> : Nouvelles exigences pour la traçabilité des produits chimiques</li>
-      <li><strong>Évaluation des alternatives</strong> : Processus plus strict pour l'évaluation des substances de substitution</li>
-      <li><strong>Protection des données</strong> : Renforcement de la confidentialité des données d'études</li>
-    </ul>
-    
-    <h2>Impact sur les industries</h2>
-    
-    <p>Ces modifications auront un impact significatif sur les entreprises du secteur chimique :</p>
-    
-    <p>Les coûts de conformité devraient augmenter, particulièrement pour les PME qui devront investir dans de nouveaux systèmes de gestion et de traçabilité. Cependant, ces changements devraient également favoriser l'innovation vers des alternatives plus sûres et plus durables.</p>
-    
-    <h2>Calendrier de mise en œuvre</h2>
-    
-    <p>Les nouvelles dispositions seront progressivement applicables :</p>
-    
-    <ul>
-      <li>1er juillet 2024 : Entrée en vigueur des nouvelles restrictions</li>
-      <li>1er janvier 2025 : Obligation de déclaration renforcée</li>
-      <li>1er juin 2025 : Nouveau processus d'évaluation des alternatives</li>
-    </ul>
-    
-    <h2>Conclusion</h2>
-    
-    <p>Les entreprises doivent se préparer dès maintenant à ces changements en auditant leurs processus actuels et en identifiant les substances concernées par les nouvelles restrictions. Une anticipation appropriée permettra de minimiser les disruptions et de maintenir la compétitivité sur le marché européen.</p>
-  `,
-  thumbnail_url:
-    "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800",
-  status: "published",
-  category_id: "1",
-  author_id: "1",
-  published_at: "2024-02-20",
-  view_count: 1250,
-  reading_time: 8,
-  allow_comments: true,
-  created_at: "2024-02-20",
-  updated_at: "2024-02-20",
-  category: {
-    id: "1",
-    name: "Réglementation",
-    slug: "reglementation",
-    type: "article",
-  },
-  author: {
-    id: "1",
-    email: "expert@mykeindustrie.com",
-    full_name: "Dr. Marie Laurent",
-    avatar_url:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200",
-    role: "admin",
-    is_active: true,
-    two_fa_enabled: false,
-    created_at: "2024-01-01",
-  },
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import ShareButton from "@/components/share/ShareButton";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { Article } from "@/lib/types";
+import { formatDate } from "@/lib/utils/format";
+
+type PublicArticle = Article & {
+  categories?: string[];
+  comment_count?: number;
+  author?: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
 };
 
-const mockComments: Commentaire[] = [
-  {
-    id: "1",
-    user_id: "2",
-    article_id: "1",
-    content:
-      "Excellent article ! Ces changements vont vraiment impacter notre façon de travailler.",
-    status: "approved",
-    parent_id: null,
-    likes: 12,
-    created_at: "2024-02-21T10:30:00Z",
-    updated_at: "2024-02-21T10:30:00Z",
-    user: {
-      id: "2",
-      email: "user@example.com",
-      full_name: "Jean Dupont",
-      avatar_url:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200",
-      role: "client",
-      is_active: true,
-      two_fa_enabled: false,
-      created_at: "2024-01-15",
-    },
-  },
-  {
-    id: "2",
-    user_id: "3",
-    article_id: "1",
-    content:
-      "Merci pour cette analyse détaillée. Est-ce que vous avez des recommandations pour les PME ?",
-    status: "approved",
-    parent_id: null,
-    likes: 8,
-    created_at: "2024-02-21T14:20:00Z",
-    updated_at: "2024-02-21T14:20:00Z",
-    user: {
-      id: "3",
-      email: "user2@example.com",
-      full_name: "Sophie Martin",
-      avatar_url: null,
-      role: "client",
-      is_active: true,
-      two_fa_enabled: false,
-      created_at: "2024-01-20",
-    },
-  },
-];
+type PublicComment = {
+  id: string;
+  user_id: string;
+  article_id: string | null;
+  formation_id: string | null;
+  content: string;
+  status: "approved" | "pending" | "rejected";
+  parent_id: string | null;
+  likes: number;
+  created_at: string;
+  updated_at: string;
+  user?: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+};
 
-export default function ArticleDetailPage() {
-  const params = useParams();
-  const { user } = useAuth();
-  const [comment, setComment] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const article = mockArticle;
+type PublicCommentNode = PublicComment & {
+  replies: PublicCommentNode[];
+};
 
-  const handleSubmitComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) {
-      toast.error("Vous devez être connecté pour commenter");
+type CommentPayload = {
+  error?: string;
+  message?: string;
+  data?: PublicComment;
+};
+
+type LikePayload = {
+  error?: string;
+  likes?: number;
+  liked?: boolean;
+  already_liked?: boolean;
+};
+
+type CommentsMeta = {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
+
+type CommentsResponse = {
+  data: PublicComment[];
+  meta: CommentsMeta;
+};
+
+const DEVICE_ID_STORAGE_KEY = "myke_device_id";
+const COMMENTS_PER_PAGE = 10;
+const editorialTitleClass = "font-[family-name:var(--font-playfair)]";
+
+function buildCommentTree(input: PublicComment[]): PublicCommentNode[] {
+  const sorted = [...input].sort((a, b) => {
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+
+  const byId = new Map<string, PublicCommentNode>();
+  sorted.forEach((comment) => {
+    byId.set(comment.id, {
+      ...comment,
+      replies: [],
+    });
+  });
+
+  const roots: PublicCommentNode[] = [];
+
+  sorted.forEach((comment) => {
+    const node = byId.get(comment.id);
+    if (!node) return;
+
+    if (comment.parent_id && byId.has(comment.parent_id)) {
+      byId.get(comment.parent_id)?.replies.push(node);
       return;
     }
-    if (!comment.trim()) return;
 
-    setIsSubmitting(true);
-    // Simulation d'envoi
-    setTimeout(() => {
-      toast.success("Commentaire ajouté avec succès");
+    roots.push(node);
+  });
+
+  return roots;
+}
+
+export default function ArticleDetailPage() {
+  const params = useParams<{ slug: string }>();
+  const { user } = useAuth();
+
+  const [article, setArticle] = useState<PublicArticle | null>(null);
+  const [comments, setComments] = useState<PublicComment[]>([]);
+  const [commentsMeta, setCommentsMeta] = useState<CommentsMeta>({
+    total: 0,
+    page: 1,
+    limit: COMMENTS_PER_PAGE,
+    totalPages: 1,
+  });
+  const [commentsPage, setCommentsPage] = useState(1);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [comment, setComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
+  const [replyComment, setReplyComment] = useState("");
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+
+  const [likingMap, setLikingMap] = useState<Record<string, boolean>>({});
+  const [likedMap, setLikedMap] = useState<Record<string, boolean>>({});
+  const [expandedReplies, setExpandedReplies] = useState<
+    Record<string, boolean>
+  >({});
+
+  const trackedSlugRef = useRef<string | null>(null);
+  const articleContentRef = useRef<HTMLElement | null>(null);
+
+  const slug = useMemo(() => {
+    if (!params?.slug) return "";
+    return Array.isArray(params.slug) ? params.slug[0] : params.slug;
+  }, [params]);
+
+  const getDeviceId = useCallback(() => {
+    if (typeof window === "undefined") return "server";
+
+    try {
+      const existing = window.localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+      if (existing) return existing;
+
+      const generated =
+        window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      window.localStorage.setItem(DEVICE_ID_STORAGE_KEY, generated);
+      return generated;
+    } catch {
+      return `fallback-${Date.now()}`;
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchArticle = async () => {
+      if (!slug) return;
+
+      try {
+        setLoading(true);
+        setErrorMessage(null);
+
+        const articleResponse = await fetch(
+          `/api/articles/${encodeURIComponent(slug)}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          },
+        );
+
+        if (!articleResponse.ok) {
+          if (articleResponse.status === 404) {
+            throw new Error("Article introuvable.");
+          }
+          throw new Error("Impossible de charger l'article.");
+        }
+
+        const articleData = (await articleResponse.json()) as PublicArticle;
+
+        if (!active) return;
+        setArticle(articleData);
+      } catch (error) {
+        if (!active) return;
+        setArticle(null);
+        setComments([]);
+        setCommentsMeta({
+          total: 0,
+          page: 1,
+          limit: COMMENTS_PER_PAGE,
+          totalPages: 1,
+        });
+        setErrorMessage(
+          error instanceof Error ? error.message : "Erreur de chargement.",
+        );
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchArticle();
+
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
+  const fetchComments = useCallback(
+    async (page: number) => {
+      if (!slug) return;
+
+      try {
+        setCommentsLoading(true);
+
+        const response = await fetch(
+          `/api/articles/${encodeURIComponent(slug)}/commentaires?page=${page}&limit=${COMMENTS_PER_PAGE}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Impossible de charger les commentaires.");
+        }
+
+        const payload = (await response.json()) as
+          | CommentsResponse
+          | PublicComment[];
+
+        if (Array.isArray(payload)) {
+          setComments(payload);
+          setCommentsMeta({
+            total: payload.length,
+            page: 1,
+            limit: payload.length || COMMENTS_PER_PAGE,
+            totalPages: 1,
+          });
+          return;
+        }
+
+        setComments(Array.isArray(payload.data) ? payload.data : []);
+        setCommentsMeta(
+          payload.meta || {
+            total: 0,
+            page,
+            limit: COMMENTS_PER_PAGE,
+            totalPages: 1,
+          },
+        );
+      } catch {
+        setComments([]);
+        setCommentsMeta({
+          total: 0,
+          page,
+          limit: COMMENTS_PER_PAGE,
+          totalPages: 1,
+        });
+      } finally {
+        setCommentsLoading(false);
+      }
+    },
+    [slug],
+  );
+
+  useEffect(() => {
+    if (!slug) return;
+    setCommentsPage(1);
+    setExpandedReplies({});
+  }, [slug]);
+
+  useEffect(() => {
+    if (!slug) return;
+    fetchComments(commentsPage);
+  }, [slug, commentsPage, user?.id, fetchComments]);
+
+  useEffect(() => {
+    if (!slug) return;
+    if (trackedSlugRef.current === slug) return;
+
+    trackedSlugRef.current = slug;
+
+    const trackView = async () => {
+      try {
+        const response = await fetch(
+          `/api/articles/${encodeURIComponent(slug)}/view`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ device_id: getDeviceId() }),
+          },
+        );
+
+        if (!response.ok) return;
+
+        const payload = (await response.json()) as { view_count?: number };
+        if (typeof payload.view_count === "number") {
+          setArticle((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              view_count: payload.view_count ?? prev.view_count,
+            };
+          });
+        }
+      } catch {
+        // Silent fail for tracking.
+      }
+    };
+
+    trackView();
+  }, [slug, getDeviceId]);
+
+  useEffect(() => {
+    const root = articleContentRef.current;
+    if (!root) return;
+
+    root.querySelectorAll("table").forEach((table) => {
+      if (table.parentElement?.classList.contains("article-table-wrap")) return;
+
+      const wrapper = document.createElement("div");
+      wrapper.className =
+        "article-table-wrap my-6 w-full overflow-x-auto rounded-xl border border-amber-200/70 bg-white";
+
+      table.parentNode?.insertBefore(wrapper, table);
+      wrapper.appendChild(table);
+
+      table.classList.add("w-full", "min-w-[680px]", "border-collapse");
+
+      table.querySelectorAll("th").forEach((th) => {
+        th.classList.add(
+          "border",
+          "border-amber-200/70",
+          "bg-amber-50/80",
+          "px-3",
+          "py-2",
+          "text-left",
+          "text-sm",
+          "font-semibold",
+          "text-slate-900",
+        );
+      });
+
+      table.querySelectorAll("td").forEach((td) => {
+        td.classList.add(
+          "border",
+          "border-amber-200/70",
+          "px-3",
+          "py-2",
+          "align-top",
+          "text-sm",
+          "text-slate-700",
+        );
+      });
+    });
+
+    root.querySelectorAll("iframe").forEach((iframe) => {
+      if (iframe.parentElement?.classList.contains("article-media-wrap"))
+        return;
+
+      const wrapper = document.createElement("div");
+      wrapper.className =
+        "article-media-wrap my-8 aspect-video w-full overflow-hidden rounded-xl border border-amber-200/70 bg-black shadow-md";
+
+      iframe.parentNode?.insertBefore(wrapper, iframe);
+      wrapper.appendChild(iframe);
+
+      iframe.removeAttribute("width");
+      iframe.removeAttribute("height");
+      iframe.classList.add("h-full", "w-full");
+      if (!iframe.getAttribute("loading")) {
+        iframe.setAttribute("loading", "lazy");
+      }
+    });
+
+    root.querySelectorAll("video").forEach((video) => {
+      video.classList.add(
+        "my-8",
+        "w-full",
+        "h-auto",
+        "rounded-xl",
+        "border",
+        "border-amber-200/70",
+        "bg-black",
+      );
+    });
+  }, [article?.content]);
+
+  const submitComment = async (
+    content: string,
+    parentId: string | null = null,
+  ) => {
+    const response = await fetch(
+      `/api/articles/${encodeURIComponent(slug)}/commentaires`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, parent_id: parentId }),
+      },
+    );
+
+    const payload = (await response.json()) as CommentPayload;
+
+    if (!response.ok || !payload.data) {
+      throw new Error(payload.error || "Impossible d'envoyer le commentaire.");
+    }
+
+    return payload;
+  };
+
+  const handleSubmitComment = async (event: FormEvent) => {
+    event.preventDefault();
+
+    if (!user) {
+      toast.error("Vous devez etre connecte pour commenter.");
+      return;
+    }
+
+    const trimmed = comment.trim();
+    if (!trimmed || !slug) return;
+
+    try {
+      setIsSubmitting(true);
+
+      const payload = await submitComment(trimmed, null);
+      if (!payload.data) return;
+
       setComment("");
+      setExpandedReplies({});
+      if (commentsPage === 1) {
+        await fetchComments(1);
+      } else {
+        setCommentsPage(1);
+      }
+      toast.success(payload.message || "Commentaire envoye.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erreur reseau pendant l'envoi.",
+      );
+    } finally {
       setIsSubmitting(false);
-    }, 1000);
-  };
-
-  const handleShare = (platform: string) => {
-    const url = window.location.href;
-    const text = article.title;
-
-    let shareUrl = "";
-    switch (platform) {
-      case "twitter":
-        shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
-        break;
-      case "facebook":
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-        break;
-      case "linkedin":
-        shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
-        break;
-    }
-
-    if (shareUrl) {
-      window.open(shareUrl, "_blank", "width=600,height=400");
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50 pt-24">
-      {/* Breadcrumb */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link
-            href="/articles"
-            className="inline-flex items-center text-sm text-slate-500 hover:text-amber-600 transition-colors"
+  const handleSubmitReply = async (parentId: string) => {
+    if (!user) {
+      toast.error("Vous devez etre connecte pour repondre.");
+      return;
+    }
+
+    const trimmed = replyComment.trim();
+    if (!trimmed || !slug) return;
+
+    try {
+      setIsSubmittingReply(true);
+
+      const payload = await submitComment(trimmed, parentId);
+      if (!payload.data) return;
+
+      setReplyComment("");
+      setReplyTargetId(null);
+      setExpandedReplies({});
+      if (commentsPage === 1) {
+        await fetchComments(1);
+      } else {
+        setCommentsPage(1);
+      }
+      toast.success(payload.message || "Reponse envoyee.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erreur reseau pendant l'envoi.",
+      );
+    } finally {
+      setIsSubmittingReply(false);
+    }
+  };
+
+  const handleLikeComment = async (commentId: string) => {
+    if (!slug) return;
+    if (likedMap[commentId]) return;
+    if (likingMap[commentId]) return;
+
+    setLikingMap((prev) => ({ ...prev, [commentId]: true }));
+
+    try {
+      const response = await fetch(
+        `/api/articles/${encodeURIComponent(slug)}/commentaires/${encodeURIComponent(commentId)}/like`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ device_id: getDeviceId() }),
+        },
+      );
+
+      const payload = (await response.json()) as LikePayload;
+
+      if (!response.ok) {
+        toast.error(payload.error || "Impossible d'aimer ce commentaire.");
+        return;
+      }
+
+      if (typeof payload.likes === "number") {
+        setComments((prev) =>
+          prev.map((item) =>
+            item.id === commentId ? { ...item, likes: payload.likes } : item,
+          ),
+        );
+      }
+
+      if (payload.liked || payload.already_liked) {
+        setLikedMap((prev) => ({ ...prev, [commentId]: true }));
+      }
+    } catch {
+      toast.error("Erreur reseau pendant l'action j'aime.");
+    } finally {
+      setLikingMap((prev) => ({ ...prev, [commentId]: false }));
+    }
+  };
+
+  const commentTree = useMemo(() => buildCommentTree(comments), [comments]);
+  const displayedCommentTotal = commentsMeta.total || comments.length;
+
+  const renderComment = (
+    commentItem: PublicCommentNode,
+    depth = 0,
+  ): ReactNode => {
+    const isReplyOpen = replyTargetId === commentItem.id;
+    const isLiking = Boolean(likingMap[commentItem.id]);
+    const isLiked = Boolean(likedMap[commentItem.id]);
+    const hasReplies = commentItem.replies.length > 0;
+    const repliesExpanded = Boolean(expandedReplies[commentItem.id]);
+
+    return (
+      <motion.div
+        key={commentItem.id}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={
+          depth > 0 ? "mt-4 ml-6 border-l border-amber-200/70 pl-4" : ""
+        }
+      >
+        <div className="flex gap-3 rounded-xl border border-amber-200/60 bg-white/85 p-4 shadow-sm">
+          <Avatar className="h-10 w-10 flex-shrink-0 border border-amber-200/70">
+            <AvatarImage src={commentItem.user?.avatar_url || undefined} />
+            <AvatarFallback className="bg-amber-100 text-amber-900">
+              {commentItem.user?.full_name?.charAt(0) || "?"}
+            </AvatarFallback>
+          </Avatar>
+
+          <div className="flex-1">
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <span className="font-medium text-slate-900">
+                {commentItem.user?.full_name || "Utilisateur"}
+              </span>
+              <span className="text-xs text-slate-500">
+                {formatDate(commentItem.created_at)}
+              </span>
+              {commentItem.status !== "approved" && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] uppercase tracking-wide"
+                >
+                  En attente de validation
+                </Badge>
+              )}
+            </div>
+
+            <p
+              className="mb-2 text-slate-700"
+              style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+            >
+              {commentItem.content}
+            </p>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-slate-600 hover:text-slate-900"
+                onClick={() => handleLikeComment(commentItem.id)}
+                disabled={isLiking || isLiked}
+              >
+                <ThumbsUp className="mr-1 h-4 w-4" />
+                {commentItem.likes}
+              </Button>
+
+              {user && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-slate-600 hover:text-slate-900"
+                  onClick={() => {
+                    if (isReplyOpen) {
+                      setReplyTargetId(null);
+                      setReplyComment("");
+                    } else {
+                      setReplyTargetId(commentItem.id);
+                      setReplyComment("");
+                    }
+                  }}
+                >
+                  <Reply className="mr-1 h-4 w-4" />
+                  Repondre
+                </Button>
+              )}
+
+              {hasReplies && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-slate-600 hover:text-slate-900"
+                  onClick={() =>
+                    setExpandedReplies((prev) => ({
+                      ...prev,
+                      [commentItem.id]: !repliesExpanded,
+                    }))
+                  }
+                >
+                  {repliesExpanded ? (
+                    <ChevronDown className="mr-1 h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="mr-1 h-4 w-4" />
+                  )}
+                  {repliesExpanded
+                    ? "Masquer les reponses"
+                    : `Voir ${commentItem.replies.length} reponse${commentItem.replies.length > 1 ? "s" : ""}`}
+                </Button>
+              )}
+            </div>
+
+            {isReplyOpen && (
+              <div className="mt-3 rounded-lg border border-amber-200/70 bg-amber-50/60 p-3">
+                <Textarea
+                  placeholder="Ecrire une reponse..."
+                  value={replyComment}
+                  onChange={(e) => setReplyComment(e.target.value)}
+                  className="mb-2 border-amber-200"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={() => {
+                      setReplyTargetId(null);
+                      setReplyComment("");
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    size="sm"
+                    type="button"
+                    onClick={() => handleSubmitReply(commentItem.id)}
+                    disabled={!replyComment.trim() || isSubmittingReply}
+                    className="bg-slate-900 text-amber-100 hover:bg-slate-800"
+                  >
+                    {isSubmittingReply ? "Envoi..." : "Repondre"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {hasReplies && repliesExpanded && (
+              <div className="mt-3">
+                {commentItem.replies.map((reply) =>
+                  renderComment(reply, depth + 1),
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[linear-gradient(180deg,#f8f3e8_0%,#fcfaf5_35%,#ffffff_100%)] pt-28">
+        <div className="mx-auto max-w-5xl px-4 py-14 text-center text-slate-500 sm:px-6 lg:px-8">
+          Chargement de l&apos;article...
+        </div>
+      </div>
+    );
+  }
+
+  if (!article || errorMessage) {
+    return (
+      <div className="min-h-screen bg-[linear-gradient(180deg,#f8f3e8_0%,#fcfaf5_35%,#ffffff_100%)] pt-28">
+        <div className="mx-auto max-w-3xl px-4 py-14 text-center sm:px-6 lg:px-8">
+          <h1
+            className={`${editorialTitleClass} text-3xl font-semibold text-slate-900`}
           >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Retour aux articles
+            Article indisponible
+          </h1>
+          <p className="mt-3 text-slate-500">
+            {errorMessage || "Cet article n'est pas disponible pour le moment."}
+          </p>
+          <Link href="/articles">
+            <Button variant="outline" className="mt-5">
+              Retour aux articles
+            </Button>
           </Link>
         </div>
       </div>
+    );
+  }
 
-      {/* Article Header */}
-      <div className="bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+  return (
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8f3e8_0%,#fcfaf5_35%,#ffffff_100%)] pt-24">
+      <section className="relative overflow-hidden border-b border-amber-200/60">
+        <div className="pointer-events-none absolute -left-20 top-8 h-52 w-52 rounded-full bg-amber-200/40 blur-3xl" />
+        <div className="pointer-events-none absolute right-10 top-10 h-36 w-36 rounded-full border border-amber-300/40" />
+
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+          <Link
+            href="/articles"
+            className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-amber-700"
           >
-            {/* Category */}
-            <Badge className="mb-4 bg-amber-500 hover:bg-amber-600">
-              {article.category?.name}
-            </Badge>
+            <ArrowLeft className="h-4 w-4" />
+            Retour aux articles
+          </Link>
 
-            {/* Title */}
-            <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-6">
-              {article.title}
-            </h1>
+          <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr),260px]">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-white/70 px-4 py-1 text-xs uppercase tracking-[0.22em] text-amber-900">
+                <Sparkles className="h-3.5 w-3.5" />
+                Edition Premium
+              </div>
 
-            {/* Meta */}
-            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mb-6">
-              {article.author && (
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={article.author.avatar_url || undefined} />
-                    <AvatarFallback className="bg-amber-100 text-amber-600 text-xs">
-                      {article.author.full_name?.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-slate-900">
-                    {article.author.full_name}
-                  </span>
-                </div>
+              {article.category?.name && (
+                <Badge className="mb-4 bg-amber-100 text-amber-900 hover:bg-amber-100">
+                  {article.category.name}
+                </Badge>
               )}
-              <span className="flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                {formatDate(article.published_at || article.created_at)}
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-4 w-4" />
-                {article.reading_time} min de lecture
-              </span>
-              <span className="flex items-center gap-1">
-                <MessageCircle className="h-4 w-4" />
-                {mockComments.length} commentaires
-              </span>
+
+              <h1
+                className={`${editorialTitleClass} text-4xl font-semibold leading-tight text-slate-900 md:text-5xl`}
+              >
+                {article.title}
+              </h1>
+
+              {article.excerpt && (
+                <p
+                  className="mt-5 text-xl leading-relaxed text-slate-600"
+                  style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+                >
+                  {article.excerpt}
+                </p>
+              )}
             </div>
 
-            {/* Share Buttons */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-500">Partager :</span>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => handleShare("twitter")}
-              >
-                <Twitter className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => handleShare("facebook")}
-              >
-                <Facebook className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => handleShare("linkedin")}
-              >
-                <Linkedin className="h-4 w-4" />
-              </Button>
-            </div>
-          </motion.div>
+            <aside className="rounded-2xl border border-amber-200/70 bg-white/85 p-4 shadow-lg shadow-amber-950/5 backdrop-blur">
+              <div className="space-y-3 text-sm text-slate-600">
+                {article.author && (
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-8 w-8 border border-amber-200/70">
+                      <AvatarImage
+                        src={article.author.avatar_url || undefined}
+                      />
+                      <AvatarFallback className="bg-amber-100 text-amber-900 text-xs">
+                        {article.author.full_name?.charAt(0) || "?"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-slate-900">
+                      {article.author.full_name}
+                    </span>
+                  </div>
+                )}
+
+                <div className="inline-flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-amber-700" />
+                  {formatDate(article.published_at || article.created_at)}
+                </div>
+
+                {article.reading_time && (
+                  <div className="inline-flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-700" />
+                    {article.reading_time} min de lecture
+                  </div>
+                )}
+
+                <div className="inline-flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-amber-700" />
+                  {article.view_count || 0} vue
+                  {(article.view_count || 0) > 1 ? "s" : ""}
+                </div>
+
+                <div className="inline-flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4 text-amber-700" />
+                  {displayedCommentTotal} commentaire
+                  {displayedCommentTotal > 1 ? "s" : ""}
+                </div>
+              </div>
+
+              <div className="mt-5 border-t border-amber-200/70 pt-4">
+                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-slate-500">
+                  Partager
+                </p>
+                <div className="flex items-center gap-2">
+                  <ShareButton
+                    title={article.title}
+                    text={article.excerpt || "Decouvrez cet article"}
+                    path={`/articles/${article.slug}`}
+                    size="sm"
+                    variant="outline"
+                    className="text-black"
+                  />
+                </div>
+              </div>
+            </aside>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Featured Image */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2 }}
-          className="relative aspect-video rounded-xl overflow-hidden shadow-xl"
-        >
-          <img
-            src={article.thumbnail_url || "/images/placeholder-article.jpg"}
-            alt={article.title}
-            className="w-full h-full object-cover"
-          />
-        </motion.div>
-      </div>
-
-      {/* Article Content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <section className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="[&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-8 [&_h2]:mb-4
-                     [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-slate-900 [&_h3]:mt-6 [&_h3]:mb-3
-                     [&_p]:text-slate-600 [&_p]:leading-relaxed [&_p]:mb-4
-                     [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-4 [&_ul]:space-y-2
-                     [&_li]:text-slate-600 [&_li]:marker:text-slate-400
-                     [&_strong]:font-semibold [&_strong]:text-slate-900"
+          transition={{ duration: 0.55 }}
+          className="relative overflow-hidden rounded-2xl border border-amber-200/70 bg-white shadow-xl shadow-amber-950/10"
+        >
+          <div className="relative aspect-[16/8]">
+            <Image
+              src={article.thumbnail_url || "/images/placeholder-article.svg"}
+              alt={article.title}
+              fill
+              className="object-cover"
+              priority
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+          </div>
+        </motion.div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+        <motion.article
+          ref={articleContentRef}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="rounded-2xl border border-amber-200/70 bg-white/90 p-6 shadow-lg shadow-amber-950/5 md:p-10
+                     [&_h2]:font-[family-name:var(--font-playfair)] [&_h2]:text-3xl [&_h2]:font-semibold [&_h2]:text-slate-900 [&_h2]:mt-10 [&_h2]:mb-4
+                     [&_h3]:font-[family-name:var(--font-playfair)] [&_h3]:text-2xl [&_h3]:font-semibold [&_h3]:text-slate-900 [&_h3]:mt-8 [&_h3]:mb-3
+                     [&_p]:text-slate-700 [&_p]:leading-8 [&_p]:mb-5
+                     [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-2 [&_ul]:mb-5
+                     [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:space-y-2 [&_ol]:mb-5
+                     [&_li]:text-slate-700
+                     [&_a]:text-amber-800 [&_a]:underline
+                     [&_blockquote]:border-l-4 [&_blockquote]:border-amber-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-slate-600"
+          style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
           dangerouslySetInnerHTML={{ __html: article.content }}
         />
-      </div>
+      </section>
 
-      {/* Comments Section */}
       {article.allow_comments && (
-        <div className="bg-white border-t">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <h2 className="text-2xl font-bold text-slate-900 mb-8">
-              Commentaires ({mockComments.length})
+        <section className="border-t border-amber-200/60 bg-[linear-gradient(180deg,#fffdf8_0%,#ffffff_100%)]">
+          <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+            <h2
+              className={`${editorialTitleClass} text-3xl font-semibold text-slate-900`}
+            >
+              Commentaires ({displayedCommentTotal})
             </h2>
 
-            {/* Comment Form */}
-            <form onSubmit={handleSubmitComment} className="mb-8">
-              <div className="flex gap-4">
-                <Avatar className="h-10 w-10 flex-shrink-0">
+            <form
+              onSubmit={handleSubmitComment}
+              className="mt-6 rounded-2xl border border-amber-200/70 bg-white p-4 shadow-sm md:p-5"
+            >
+              <div className="flex gap-3">
+                <Avatar className="h-10 w-10 flex-shrink-0 border border-amber-200/70">
                   <AvatarImage src={user?.avatar_url || undefined} />
-                  <AvatarFallback className="bg-amber-100 text-amber-600">
+                  <AvatarFallback className="bg-amber-100 text-amber-900">
                     {user?.full_name?.charAt(0) || "?"}
                   </AvatarFallback>
                 </Avatar>
+
                 <div className="flex-1">
                   <Textarea
                     placeholder={
@@ -341,16 +918,16 @@ export default function ArticleDetailPage() {
                     }
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    className="mb-2"
+                    className="mb-2 border-amber-200"
                     disabled={!user}
                   />
                   <div className="flex justify-end">
                     <Button
                       type="submit"
                       disabled={!user || !comment.trim() || isSubmitting}
-                      className="bg-slate-900 hover:bg-amber-500 hover:text-slate-950"
+                      className="bg-slate-900 text-amber-100 hover:bg-slate-800"
                     >
-                      <Send className="h-4 w-4 mr-2" />
+                      <Send className="mr-2 h-4 w-4" />
                       {isSubmitting ? "Envoi..." : "Publier"}
                     </Button>
                   </div>
@@ -358,46 +935,59 @@ export default function ArticleDetailPage() {
               </div>
             </form>
 
-            {/* Comments List */}
-            <div className="space-y-6">
-              {mockComments.map((comment) => (
-                <motion.div
-                  key={comment.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex gap-4"
-                >
-                  <Avatar className="h-10 w-10 flex-shrink-0">
-                    <AvatarImage src={comment.user?.avatar_url || undefined} />
-                    <AvatarFallback className="bg-slate-100 text-slate-600">
-                      {comment.user?.full_name?.charAt(0) || "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-slate-900">
-                        {comment.user?.full_name}
-                      </span>
-                      <span className="text-sm text-slate-500">
-                        {formatDate(comment.created_at)}
-                      </span>
-                    </div>
-                    <p className="text-slate-700 mb-2">{comment.content}</p>
-                    <div className="flex items-center gap-4">
-                      <button className="flex items-center gap-1 text-sm text-slate-500 hover:text-amber-600">
-                        <ThumbsUp className="h-4 w-4" />
-                        {comment.likes}
-                      </button>
-                      <button className="text-sm text-slate-500 hover:text-amber-600">
-                        Répondre
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+            {commentsLoading ? (
+              <p className="mt-6 text-sm text-slate-500">
+                Chargement des commentaires...
+              </p>
+            ) : commentTree.length === 0 ? (
+              <p className="mt-6 text-sm text-slate-500">
+                Aucun commentaire pour le moment.
+              </p>
+            ) : (
+              <div className="mt-6 space-y-5">
+                {commentTree.map((commentItem) => renderComment(commentItem))}
+              </div>
+            )}
+
+            {commentsMeta.totalPages > 1 && (
+              <div className="mt-8 flex flex-col gap-3 rounded-xl border border-amber-200/70 bg-white/80 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-600">
+                  Page {commentsMeta.page} sur {commentsMeta.totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={commentsPage <= 1 || commentsLoading}
+                    onClick={() => {
+                      setExpandedReplies({});
+                      setCommentsPage((prev) => Math.max(1, prev - 1));
+                    }}
+                  >
+                    Precedent
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={
+                      commentsPage >= commentsMeta.totalPages || commentsLoading
+                    }
+                    onClick={() => {
+                      setExpandedReplies({});
+                      setCommentsPage((prev) =>
+                        Math.min(commentsMeta.totalPages, prev + 1),
+                      );
+                    }}
+                  >
+                    Suivant
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

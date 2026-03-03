@@ -190,6 +190,31 @@ export default function CheckoutPage() {
 
     try {
       const startedAt = Date.now();
+      const cartItemsPayload = items
+        .map((item) => {
+          const itemId =
+            item.item_type === 'produit'
+              ? item.produit_id
+              : item.item_type === 'formation'
+                ? item.formation_id
+                : item.video_id;
+
+          if (!itemId) return null;
+
+          return {
+            item_type: item.item_type,
+            item_id: itemId,
+            quantity: Math.max(1, Number(item.quantity || 1)),
+            unit_price: Number(item.unit_price || 0),
+          };
+        })
+        .filter((entry): entry is {
+          item_type: 'produit' | 'formation' | 'video';
+          item_id: string;
+          quantity: number;
+          unit_price: number;
+        } => Boolean(entry));
+
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -205,6 +230,7 @@ export default function CheckoutPage() {
             country: shippingInfo.country,
             phone: shippingInfo.phone || null,
           },
+          cart_items: cartItemsPayload,
         }),
       });
 

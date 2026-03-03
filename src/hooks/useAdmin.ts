@@ -348,7 +348,10 @@ export function useProduits(params?: { type?: string; status?: string }) {
       if (params?.status) searchParams.set('status', params.status);
 
       const res = await fetch(`/api/admin/produits?${searchParams}`);
-      if (!res.ok) throw new Error('Failed to fetch produits');
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error || 'Failed to fetch produits');
+      }
       return res.json();
     },
   });

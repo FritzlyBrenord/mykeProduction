@@ -48,23 +48,14 @@ interface OrderRow {
 
 export async function GET() {
   try {
-    console.log("API Compte Formations - Début requête");
     const supabase = await createClient();
-    console.log("API Compte Formations - Client Supabase créé:", !!supabase);
     
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
 
-    console.log("API Compte Formations - Auth check:", { 
-      user: !!user, 
-      userId: user?.id,
-      error: userError?.message 
-    });
-
     if (userError || !user) {
-      console.log("API Compte Formations - Non authentifié");
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -18,6 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useAuth } from "@/lib/hooks/useAuth";
 import { Formation } from "@/lib/types";
 import { motion } from "framer-motion";
 import { Filter, Search, Sparkles, X } from "lucide-react";
@@ -38,6 +39,7 @@ function normalizeText(value: string | null | undefined) {
 }
 
 export default function FormationsPage() {
+  const { user, loading: authLoading } = useAuth();
   const [formations, setFormations] = useState<Formation[]>([]);
   const [purchasedFormationIds, setPurchasedFormationIds] = useState<string[]>(
     [],
@@ -55,21 +57,15 @@ export default function FormationsPage() {
   useEffect(() => {
     let active = true;
 
-    const fetchFormations = async () => {
+    const fetchPublicFormations = async () => {
       try {
         setIsLoading(true);
         setFetchError(null);
 
-        const [response, accountResponse] = await Promise.all([
-          fetch("/api/formations?limit=200", {
-            method: "GET",
-            cache: "no-store",
-          }),
-          fetch("/api/compte/formations", {
-            method: "GET",
-            cache: "no-store",
-          }),
-        ]);
+        const response = await fetch("/api/formations?limit=200", {
+          method: "GET",
+          cache: "no-store",
+        });
 
         if (!response.ok) {
           throw new Error("Impossible de charger les formations publiees.");
@@ -78,23 +74,10 @@ export default function FormationsPage() {
         const data = (await response.json()) as Formation[];
         if (!active) return;
         setFormations(Array.isArray(data) ? data : []);
-
-        if (accountResponse.ok) {
-          const accountData = (await accountResponse.json()) as {
-            enrollments?: Array<{ formation_id: string | null }>;
-          };
-          const ids = (accountData.enrollments ?? [])
-            .map((entry) => entry.formation_id)
-            .filter((id): id is string => Boolean(id));
-          setPurchasedFormationIds(ids);
-        } else if (accountResponse.status === 401) {
-          setPurchasedFormationIds([]);
-        }
       } catch {
         if (!active) return;
         setFetchError("Impossible de recuperer les formations pour le moment.");
         setFormations([]);
-        setPurchasedFormationIds([]);
       } finally {
         if (active) {
           setIsLoading(false);
@@ -102,12 +85,57 @@ export default function FormationsPage() {
       }
     };
 
-    fetchFormations();
+    fetchPublicFormations();
 
     return () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchPurchasedFormations = async () => {
+      if (authLoading) return;
+
+      if (!user) {
+        setPurchasedFormationIds([]);
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/compte/formations", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (!active) return;
+
+        if (!response.ok) {
+          setPurchasedFormationIds([]);
+          return;
+        }
+
+        const accountData = (await response.json()) as {
+          enrollments?: Array<{ formation_id: string | null }>;
+        };
+
+        const ids = (accountData.enrollments ?? [])
+          .map((entry) => entry.formation_id)
+          .filter((id): id is string => Boolean(id));
+        setPurchasedFormationIds(ids);
+      } catch {
+        if (!active) return;
+        setPurchasedFormationIds([]);
+      }
+    };
+
+    fetchPurchasedFormations();
+
+    return () => {
+      active = false;
+    };
+  }, [user, authLoading]);
 
   const categories = useMemo(() => {
     const names = formations

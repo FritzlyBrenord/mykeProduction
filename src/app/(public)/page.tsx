@@ -1,143 +1,179 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { AlertCircle, Loader2 } from "lucide-react";
 import HeroSection from "@/components/sections/HeroSection";
 import FeaturedFormations from "@/components/sections/FeaturedFormations";
 import FeaturedProducts from "@/components/sections/FeaturedProducts";
 import LatestArticles from "@/components/sections/LatestArticles";
 import LatestVideos from "@/components/sections/LatestVideos";
+import { Article, Formation, Produit, Video } from "@/lib/types";
 
-// Données mockées
-const mockFormations = [
-  {
-    id: "1",
-    title: "Introduction à la chimie industrielle",
-    description: "Formation complète sur les bases de la chimie industrielle",
-    price: 299,
-    image: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800",
-    duration: "8 heures",
-    level: "Débutant",
-    category: "Chimie",
-  },
-  {
-    id: "2",
-    title: "Sécurité industrielle avancée",
-    description: "Protocoles de sécurité pour les environnements industriels",
-    price: 499,
-    image: "https://images.unsplash.com/photo-1559028012-c7547e934d0e?w=800",
-    duration: "12 heures",
-    level: "Avancé",
-    category: "Sécurité",
-  },
-];
+type CollectionPayload<T> = T[] | { data?: T[] };
 
-const mockProduits = [
-  {
-    id: "1",
-    name: "Acide Sulfurique Concentré",
-    description:
-      "Acide sulfurique de haute pureté pour applications industrielles",
-    price: 89.99,
-    image: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800",
-    category: "Acides",
-    stock: 50,
-  },
-  {
-    id: "2",
-    name: "Hydroxyde de Sodium",
-    description:
-      "Soude caustique pour traitement des eaux et applications industrielles",
-    price: 45.99,
-    image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=800",
-    category: "Bases",
-    stock: 100,
-  },
-];
+function extractCollection<T>(payload: CollectionPayload<T>): T[] {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
 
-const mockArticles = [
-  {
-    id: "1",
-    title: "Les dernières innovations en chimie verte",
-    excerpt:
-      "Découvrez les nouvelles tendances et technologies qui transforment l'industrie chimique...",
-    image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=800",
-    published_at: "2024-02-15",
-    created_at: "2024-02-15",
-    readTime: "5 min",
-    category: "Innovation",
-  },
-  {
-    id: "2",
-    title: "Optimisation des processus industriels",
-    excerpt:
-      "Comment améliorer l'efficacité de vos processus de production tout en réduisant les coûts...",
-    image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800",
-    published_at: "2024-02-10",
-    created_at: "2024-02-10",
-    readTime: "8 min",
-    category: "Processus",
-  },
-];
+  if (payload && Array.isArray(payload.data)) {
+    return payload.data;
+  }
 
-const mockVideos = [
-  {
-    id: "1",
-    title: "Démonstration: Réaction chimique contrôlée",
-    thumbnail:
-      "https://images.unsplash.com/photo-1596495878696-a6ffa7ba0ec1?w=800",
-    duration: "12:45",
-    view_count: 15420,
-    access_type: "public",
-    category: "Démonstration",
-  },
-  {
-    id: "2",
-    title: "Tutorial: Maintenance des équipements",
-    thumbnail:
-      "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800",
-    duration: "18:30",
-    view_count: 8932,
-    access_type: "public",
-    category: "Maintenance",
-  },
-];
+  return [];
+}
+
+async function fetchCollection<T>(url: string): Promise<T[]> {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Request failed for ${url}`);
+  }
+
+  const payload = (await response.json()) as CollectionPayload<T>;
+  return extractCollection(payload);
+}
 
 export default function HomePage() {
+  const [formations, setFormations] = useState<Formation[]>([]);
+  const [produits, setProduits] = useState<Produit[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadHomepageData = async () => {
+      setLoading(true);
+      setLoadingError(null);
+
+      const [formationsResult, produitsResult, articlesResult, videosResult] =
+        await Promise.allSettled([
+          fetchCollection<Formation>("/api/formations?limit=8"),
+          fetchCollection<Produit>("/api/produits?limit=8"),
+          fetchCollection<Article>("/api/articles?limit=1"),
+          fetchCollection<Video>("/api/videos?limit=6"),
+        ]);
+
+      if (cancelled) return;
+
+      let hasError = false;
+
+      if (formationsResult.status === "fulfilled") {
+        setFormations(formationsResult.value.slice(0, 8));
+      } else {
+        setFormations([]);
+        hasError = true;
+      }
+
+      if (produitsResult.status === "fulfilled") {
+        setProduits(produitsResult.value.slice(0, 8));
+      } else {
+        setProduits([]);
+        hasError = true;
+      }
+
+      if (articlesResult.status === "fulfilled") {
+        setArticles(articlesResult.value.slice(0, 1));
+      } else {
+        setArticles([]);
+        hasError = true;
+      }
+
+      if (videosResult.status === "fulfilled") {
+        setVideos(videosResult.value.slice(0, 6));
+      } else {
+        setVideos([]);
+        hasError = true;
+      }
+
+      if (hasError) {
+        setLoadingError(
+          "Certaines sections n'ont pas pu etre chargees. Reessayez dans quelques instants.",
+        );
+      }
+
+      setLoading(false);
+    };
+
+    void loadHomepageData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const hasAnySectionData =
+    formations.length > 0 ||
+    produits.length > 0 ||
+    articles.length > 0 ||
+    videos.length > 0;
+
   return (
     <div className="min-h-screen">
       <HeroSection />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-      >
-        <FeaturedFormations formations={mockFormations} />
-      </motion.div>
+      {loadingError && (
+        <section className="px-4 sm:px-6 lg:px-8 py-8 bg-slate-950">
+          <div className="mx-auto max-w-7xl rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-amber-100 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            <p className="text-sm">{loadingError}</p>
+          </div>
+        </section>
+      )}
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-      >
-        <FeaturedProducts produits={mockProduits} />
-      </motion.div>
+      {loading && !hasAnySectionData ? (
+        <section className="px-4 sm:px-6 lg:px-8 py-16 bg-slate-950">
+          <div className="mx-auto max-w-7xl flex items-center justify-center gap-3 text-slate-200">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span>Chargement des contenus recents...</span>
+          </div>
+        </section>
+      ) : (
+        <>
+          {formations.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              <FeaturedFormations formations={formations} />
+            </motion.div>
+          )}
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.6 }}
-      >
-        <LatestArticles articles={mockArticles} />
-      </motion.div>
+          {produits.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <FeaturedProducts produits={produits} />
+            </motion.div>
+          )}
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.8 }}
-      >
-        <LatestVideos videos={mockVideos} />
-      </motion.div>
+          {articles.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <LatestArticles articles={articles} />
+            </motion.div>
+          )}
+
+          {videos.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              <LatestVideos videos={videos} />
+            </motion.div>
+          )}
+        </>
+      )}
     </div>
   );
 }

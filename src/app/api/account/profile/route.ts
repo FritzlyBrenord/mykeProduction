@@ -21,7 +21,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, avatar_url, phone_encrypted, country, bio, created_at")
+    .select("id, full_name, avatar_url, role, is_active, deleted_at, phone_encrypted, country, bio, created_at")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -34,6 +34,9 @@ export async function GET() {
     email: user.email ?? "",
     fullName: data?.full_name ?? user.user_metadata?.full_name ?? "",
     avatarUrl: data?.avatar_url ?? null,
+    role: data?.role ?? "client",
+    isActive: data?.is_active ?? true,
+    deletedAt: data?.deleted_at ?? null,
     phone: data?.phone_encrypted ?? null,
     country: data?.country ?? null,
     bio: data?.bio ?? null,
@@ -84,7 +87,7 @@ export async function PATCH(request: NextRequest) {
   const { data, error } = await supabase
     .from("profiles")
     .upsert(payload, { onConflict: "id" })
-    .select("id, full_name, avatar_url, phone_encrypted, country, bio, created_at")
+    .select("id, full_name, avatar_url, role, is_active, deleted_at, phone_encrypted, country, bio, created_at")
     .single();
 
   if (error) {
@@ -96,6 +99,9 @@ export async function PATCH(request: NextRequest) {
     email: user.email ?? "",
     fullName: data.full_name ?? "",
     avatarUrl: data.avatar_url ?? null,
+    role: data.role ?? "client",
+    isActive: data.is_active ?? true,
+    deletedAt: data.deleted_at ?? null,
     phone: data.phone_encrypted ?? null,
     country: data.country ?? null,
     bio: data.bio ?? null,

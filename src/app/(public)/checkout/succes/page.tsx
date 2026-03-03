@@ -9,7 +9,7 @@ import { useSearchParams } from 'next/navigation';
 
 export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
-  const orderId = searchParams.get('order') || 'Commande';
+  const orderId = searchParams.get('order');
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center py-12 px-4">
@@ -39,7 +39,9 @@ export default function CheckoutSuccessPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-slate-500 mb-1">Numero de commande</p>
-                  <p className="font-semibold text-slate-900 break-all">{orderId}</p>
+                  <p className="font-semibold text-slate-900 break-all">
+                    {orderId || 'Indisponible'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-500 mb-1">Date</p>
@@ -75,9 +77,20 @@ export default function CheckoutSuccessPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href={
+                  orderId
+                    ? `/compte/commandes/${encodeURIComponent(orderId)}`
+                    : '/compte/commandes'
+                }
+              >
+                <Button variant="outline" className="w-full sm:w-auto">
+                  Suivre cette commande
+                </Button>
+              </Link>
               <Link href="/compte/commandes">
                 <Button variant="outline" className="w-full sm:w-auto">
-                  Voir mes commandes
+                  Voir toutes mes commandes
                 </Button>
               </Link>
               <Link href="/">

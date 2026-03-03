@@ -14,6 +14,7 @@ interface LatestArticlesProps {
 export default function LatestArticles({ articles }: LatestArticlesProps) {
   const featuredArticle = articles[0];
   const otherArticles = articles.slice(1, 4);
+  const hasOtherArticles = otherArticles.length > 0;
 
   return (
     <section className="py-20 lg:py-28 bg-white">
@@ -31,10 +32,10 @@ export default function LatestArticles({ articles }: LatestArticlesProps) {
               <span className="font-medium">Articles</span>
             </div>
             <h2 className="text-3xl lg:text-4xl font-bold text-slate-900">
-              Derniers articles
+              {hasOtherArticles ? "Derniers articles" : "Dernier article"}
             </h2>
             <p className="text-slate-600 mt-2 max-w-xl">
-              Actualités, analyses et conseils d'experts sur l'industrie.
+              Actualités, analyses et conseils d&apos;experts sur l&apos;industrie.
             </p>
           </div>
           <Link href="/articles">
@@ -46,25 +47,31 @@ export default function LatestArticles({ articles }: LatestArticlesProps) {
         </motion.div>
 
         {/* Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div
+          className={`grid grid-cols-1 gap-8 ${
+            hasOtherArticles ? "lg:grid-cols-2" : ""
+          }`}
+        >
           {/* Featured Article */}
           {featuredArticle && (
-            <div className="lg:row-span-2">
+            <div className={hasOtherArticles ? "lg:row-span-2" : ""}>
               <ArticleCard article={featuredArticle} variant="featured" />
             </div>
           )}
 
           {/* Other Articles */}
-          <div className="space-y-6">
-            {otherArticles.map((article, index) => (
-              <ArticleCard 
-                key={article.id} 
-                article={article} 
-                variant="horizontal" 
-                index={index}
-              />
-            ))}
-          </div>
+          {hasOtherArticles && (
+            <div className="space-y-6">
+              {otherArticles.map((article, index) => (
+                <ArticleCard
+                  key={article.id}
+                  article={article}
+                  variant="horizontal"
+                  index={index}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>

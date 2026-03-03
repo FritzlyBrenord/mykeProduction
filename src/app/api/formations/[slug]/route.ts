@@ -26,6 +26,23 @@ const FORMATION_PUBLIC_SELECT = `
   author:profiles(id,full_name,avatar_url)
 `;
 
+async function getEnrollmentCountByFormationId(formationId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("enrollments")
+    .select("user_id")
+    .eq("formation_id", formationId);
+
+  if (error) throw error;
+
+  const uniqueUserIds = new Set(
+    ((data ?? []) as Array<{ user_id: string | null }>)
+      .map((row) => row.user_id)
+      .filter((userId): userId is string => Boolean(userId)),
+  );
+
+  return uniqueUserIds.size;
+}
+
 export async function GET(
   _: NextRequest,
   context: { params: Promise<{ slug: string }> },
@@ -48,7 +65,11 @@ export async function GET(
       throw error;
     }
 
-    return NextResponse.json(data);
+    const enrolledCount = await getEnrollmentCountByFormationId(data.id);
+    return NextResponse.json({
+      ...data,
+      enrolled_count: enrolledCount,
+    });
   } catch (error) {
     console.error("Public formation detail fetch error:", error);
     return NextResponse.json(

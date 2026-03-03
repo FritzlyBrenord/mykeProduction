@@ -11,8 +11,55 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
     
     if (error) throw error;
+
+    const rows = (data || []) as Array<{
+      id: string;
+      likes?: number | null;
+      allow_comments?: boolean | null;
+    } & Record<string, unknown>>;
+
+    const videoIds = rows.map((row) => row.id);
+    const commentsByVideoId = new Map<string, number>();
+    const likesByVideoId = new Map<string, number>();
+
+    if (videoIds.length > 0) {
+      const { data: commentsRows, error: commentsError } = await supabaseAdmin
+        .from('commentaires')
+        .select('video_id')
+        .in('video_id', videoIds)
+        .eq('status', 'approved')
+        .is('deleted_at', null);
+
+      if (!commentsError) {
+        (commentsRows || []).forEach((row) => {
+          const videoId = (row as { video_id?: string | null }).video_id;
+          if (!videoId) return;
+          commentsByVideoId.set(videoId, (commentsByVideoId.get(videoId) || 0) + 1);
+        });
+      }
+
+      const { data: likesRows, error: likesError } = await supabaseAdmin
+        .from('video_likes')
+        .select('video_id')
+        .in('video_id', videoIds);
+
+      if (!likesError) {
+        (likesRows || []).forEach((row) => {
+          const videoId = (row as { video_id?: string | null }).video_id;
+          if (!videoId) return;
+          likesByVideoId.set(videoId, (likesByVideoId.get(videoId) || 0) + 1);
+        });
+      }
+    }
     
-    return NextResponse.json(data || []);
+    return NextResponse.json(
+      rows.map((row) => ({
+        ...row,
+        allow_comments: row.allow_comments ?? true,
+        like_count: likesByVideoId.get(row.id) ?? Number(row.likes || 0),
+        comment_count: commentsByVideoId.get(row.id) ?? 0,
+      })),
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch videos';
     console.error('Videos fetch error:', error);

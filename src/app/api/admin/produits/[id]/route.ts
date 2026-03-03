@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { normalizeProductRecord, normalizeProductType, normalizeStringArray } from '@/lib/products';
 
 // GET /api/admin/produits/[id] - Get a single produit
 export async function GET(
@@ -20,8 +21,8 @@ export async function GET(
             return NextResponse.json({ error: 'Produit not found' }, { status: 404 });
         }
 
-        return NextResponse.json(data);
-    } catch (error: any) {
+        return NextResponse.json(normalizeProductRecord(data as Record<string, unknown>));
+    } catch (error) {
         console.error('Produit fetch error:', error);
         return NextResponse.json(
             { error: 'Failed to fetch produit' },
@@ -54,8 +55,8 @@ export async function PUT(
                 description: body.description,
                 content: body.content,
                 price: body.price,
-                images: body.images,
-                type: body.type,
+                images: normalizeStringArray(body.images),
+                type: normalizeProductType(body.type),
                 stock: body.stock,
                 is_digital: body.is_digital,
                 file_url: body.file_url,
@@ -91,8 +92,8 @@ export async function PUT(
             new_data: data,
         });
 
-        return NextResponse.json(data);
-    } catch (error: any) {
+        return NextResponse.json(normalizeProductRecord(data as Record<string, unknown>));
+    } catch (error) {
         console.error('Produit update error:', error);
         return NextResponse.json(
             { error: 'Failed to update produit' },
@@ -132,7 +133,7 @@ export async function DELETE(
         });
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Produit delete error:', error);
         return NextResponse.json(
             { error: 'Failed to delete produit' },

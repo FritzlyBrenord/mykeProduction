@@ -6,18 +6,24 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 let browserClient: SupabaseClient<Database> | undefined;
 
-export function createClient() {
+export function createClient(url?: string, anonKey?: string) {
   if (browserClient) {
     return browserClient;
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const finalUrl = url ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const finalAnonKey = anonKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
-  if (!url || !anonKey) {
+  if (!finalUrl || !finalAnonKey) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
   }
   
-  browserClient = createBrowserClient<Database>(url, anonKey);
+  browserClient = createBrowserClient<Database>(finalUrl, finalAnonKey, {
+    cookieOptions: {
+      path: "/",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
+  });
   return browserClient;
 }

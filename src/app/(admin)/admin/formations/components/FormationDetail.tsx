@@ -763,9 +763,9 @@ export default function FormationDetail({
                   Liste des inscrits
                 </h3>
                 <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
-                  {enrolledUsers.length} personne
-                  {enrolledUsers.length > 1 ? "s" : ""} ayant achete cette
-                  formation.
+                  {totalEnrolled} personne
+                  {totalEnrolled > 1 ? "s" : ""} inscrite
+                  {totalEnrolled > 1 ? "s" : ""} a cette formation.
                 </p>
 
                 {enrolledUsers.length === 0 ? (

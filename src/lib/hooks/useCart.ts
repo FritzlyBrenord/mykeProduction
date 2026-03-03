@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { CartItem, Formation, Produit, Video } from '@/lib/types';
-import { SupabaseClient } from '@supabase/supabase-js';
+import { Session, SupabaseClient } from '@supabase/supabase-js';
 import React from 'react';
 import {
   ReactNode,
@@ -20,6 +20,10 @@ interface AddCartItemInput {
   item_id: string;
   unit_price: number;
   quantity?: number;
+  item_name?: string;
+  item_image?: string | null;
+  produit_type?: Produit['type'] | null;
+  is_digital?: boolean | null;
 }
 
 interface CartContextType {
@@ -40,6 +44,10 @@ interface GuestCartEntry {
   unit_price: number;
   quantity: number;
   added_at: string;
+  item_name?: string;
+  item_image?: string | null;
+  produit_type?: Produit['type'] | null;
+  is_digital?: boolean | null;
 }
 
 interface DbCartItemRow {
@@ -77,6 +85,28 @@ function localItemKey(entry: Pick<GuestCartEntry, 'item_type' | 'item_id'>) {
 
 function toLocalItemId(entry: Pick<GuestCartEntry, 'item_type' | 'item_id'>) {
   return `${LOCAL_ITEM_PREFIX}${localItemKey(entry)}`;
+}
+
+function sanitizeGuestText(value: unknown, max = 160) {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, max);
+}
+
+function sanitizeGuestImage(value: unknown) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('/') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  return null;
+}
+
+function sanitizeGuestProductType(value: unknown): Produit['type'] | null {
+  if (value === 'chimique' || value === 'document' || value === 'autre') return value;
+  return null;
 }
 
 function parseLocalItemId(itemId: string) {
@@ -117,6 +147,10 @@ function readGuestCart(): GuestCartEntry[] {
           unit_price: unitPrice,
           quantity: normalizeQuantity(row.quantity),
           added_at: typeof row.added_at === 'string' ? row.added_at : new Date().toISOString(),
+          item_name: sanitizeGuestText(row.item_name),
+          item_image: sanitizeGuestImage(row.item_image),
+          produit_type: sanitizeGuestProductType(row.produit_type),
+          is_digital: typeof row.is_digital === 'boolean' ? row.is_digital : null,
         } satisfies GuestCartEntry;
       })
       .filter((entry): entry is GuestCartEntry => Boolean(entry));
@@ -132,6 +166,10 @@ function readGuestCart(): GuestCartEntry[] {
       merged.set(key, {
         ...existing,
         quantity: normalizeQuantity(existing.quantity + entry.quantity),
+        item_name: existing.item_name || entry.item_name,
+        item_image: existing.item_image || entry.item_image || null,
+        produit_type: existing.produit_type || entry.produit_type || null,
+        is_digital: typeof existing.is_digital === 'boolean' ? existing.is_digital : entry.is_digital ?? null,
       });
     });
 
@@ -180,6 +218,68 @@ function mapDbRowsToCartItems(rows: DbCartItemRow[]): CartItem[] {
   }));
 }
 
+function buildGuestProductSnapshot(entry: GuestCartEntry): Produit | undefined {
+  if (entry.item_type !== 'produit') return undefined;
+
+  return {
+    id: entry.item_id,
+    name: entry.item_name || 'Produit',
+    slug: '',
+    description: null,
+    content: null,
+    price: Number(entry.unit_price) || 0,
+    images: entry.item_image ? [entry.item_image] : [],
+    type: entry.produit_type ?? 'autre',
+    stock: null,
+    is_digital: typeof entry.is_digital === 'boolean' ? entry.is_digital : false,
+    file_url: null,
+    cas_number: null,
+    msds_url: null,
+    purity: null,
+    unit: null,
+    min_order: 1,
+    ghs_pictograms: [],
+    hazard_statements: [],
+    precautionary_statements: [],
+    signal_word: null,
+    age_restricted: false,
+    restricted_sale: false,
+    adr_class: null,
+    status: 'published',
+    category_id: null,
+    featured: false,
+    created_at: new Date(0).toISOString(),
+    updated_at: new Date(0).toISOString(),
+  } as Produit;
+}
+
+function buildGuestFormationSnapshot(entry: GuestCartEntry): Formation | undefined {
+  if (entry.item_type !== 'formation') return undefined;
+
+  return {
+    id: entry.item_id,
+    title: entry.item_name || 'Formation',
+    slug: '',
+    description: null,
+    content: null,
+    thumbnail_url: entry.item_image || null,
+    price: Number(entry.unit_price) || 0,
+    is_free: (Number(entry.unit_price) || 0) <= 0,
+    format: 'video',
+    status: 'published',
+    category_id: null,
+    author_id: null,
+    duration_hours: null,
+    level: null,
+    language: 'fr',
+    certificate: false,
+    enrolled_count: 0,
+    rating_avg: 0,
+    created_at: new Date(0).toISOString(),
+    updated_at: new Date(0).toISOString(),
+  } as Formation;
+}
+
 function mapGuestToCartItems(
   entries: GuestCartEntry[],
   products: Map<string, Produit>,
@@ -188,8 +288,14 @@ function mapGuestToCartItems(
 ): CartItem[] {
   return entries.map((entry) => {
     const localId = toLocalItemId(entry);
-    const product = entry.item_type === 'produit' ? products.get(entry.item_id) : undefined;
-    const formation = entry.item_type === 'formation' ? formations.get(entry.item_id) : undefined;
+    const product =
+      entry.item_type === 'produit'
+        ? products.get(entry.item_id) || buildGuestProductSnapshot(entry)
+        : undefined;
+    const formation =
+      entry.item_type === 'formation'
+        ? formations.get(entry.item_id) || buildGuestFormationSnapshot(entry)
+        : undefined;
     const video = entry.item_type === 'video' ? videos.get(entry.item_id) : undefined;
 
     return {
@@ -207,6 +313,23 @@ function mapGuestToCartItems(
       video,
     } satisfies CartItem;
   });
+}
+
+function mapGuestEntriesToLocalOnly(entries: GuestCartEntry[]): CartItem[] {
+  return entries.map((entry) => ({
+    id: toLocalItemId(entry),
+    cart_id: 'local',
+    produit_id: entry.item_type === 'produit' ? entry.item_id : null,
+    formation_id: entry.item_type === 'formation' ? entry.item_id : null,
+    video_id: entry.item_type === 'video' ? entry.item_id : null,
+    item_type: entry.item_type,
+    quantity: normalizeQuantity(entry.quantity),
+    unit_price: Number(entry.unit_price) || 0,
+    added_at: entry.added_at,
+    produit: buildGuestProductSnapshot(entry),
+    formation: buildGuestFormationSnapshot(entry),
+    video: undefined,
+  }));
 }
 
 async function ensureUserCartId(supabase: SupabaseClient, userId: string): Promise<string | null> {
@@ -235,6 +358,35 @@ async function ensureUserCartId(supabase: SupabaseClient, userId: string): Promi
   }
 
   return inserted.id;
+}
+
+async function getSessionSafe(
+  client: SupabaseClient,
+  timeoutMs: number = 1800,
+): Promise<Session | null> {
+  try {
+    const result = await Promise.race([
+      client.auth.getSession(),
+      new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+
+    if (!result) return null;
+
+    const sessionResult = result as Awaited<ReturnType<SupabaseClient['auth']['getSession']>>;
+    if (sessionResult.error) {
+      const message = String(sessionResult.error.message || '').toLowerCase();
+      if (!message.includes('auth session missing')) {
+        console.error('Cart getSession error:', sessionResult.error);
+      }
+      return null;
+    }
+
+    return sessionResult.data?.session ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -271,6 +423,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
           .in('id', productIds)
           .eq('status', 'published');
         (data ?? []).forEach((row) => productsById.set(row.id, row as Produit));
+
+        const missingProductIds = productIds.filter((id) => !productsById.has(id));
+        if (missingProductIds.length > 0) {
+          try {
+            const response = await fetch(
+              `/api/produits?ids=${encodeURIComponent(missingProductIds.join(','))}&limit=200&page=1`,
+              { cache: 'no-store' },
+            );
+            if (response.ok) {
+              const payload = (await response.json()) as { data?: Produit[] };
+              (payload.data ?? []).forEach((row) => {
+                if (row?.id) {
+                  productsById.set(row.id, row);
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Fallback product metadata fetch error:', error);
+          }
+        }
       }
 
       if (formationIds.length > 0) {
@@ -280,6 +452,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
           .in('id', formationIds)
           .eq('status', 'published');
         (data ?? []).forEach((row) => formationsById.set(row.id, row as Formation));
+
+        const missingFormationIds = formationIds.filter((id) => !formationsById.has(id));
+        if (missingFormationIds.length > 0) {
+          try {
+            const response = await fetch(
+              `/api/formations?ids=${encodeURIComponent(missingFormationIds.join(','))}&limit=200`,
+              { cache: 'no-store' },
+            );
+            if (response.ok) {
+              const payload = (await response.json()) as Formation[];
+              (payload ?? []).forEach((row) => {
+                if (row?.id) {
+                  formationsById.set(row.id, row);
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Fallback formation metadata fetch error:', error);
+          }
+        }
       }
 
       if (videoIds.length > 0) {
@@ -391,18 +583,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshCart = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase) {
+      setItems(mapGuestEntriesToLocalOnly(readGuestCart()));
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getSessionSafe(supabase);
 
       if (session?.user) {
         await fetchUserCart(supabase, session.user.id);
       } else {
-        await fetchGuestCart(supabase);
+        setItems(mapGuestEntriesToLocalOnly(readGuestCart()));
+        void fetchGuestCart(supabase);
       }
     } finally {
       setLoading(false);
@@ -413,19 +608,34 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+    // Safety timeout - force loading to false after 3 seconds
+    const safetyTimeout = setTimeout(() => {
+      setLoading((current) => {
+        if (current) {
+          return false;
+        }
+        return current;
+      });
+    }, 3000);
+
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.warn('Supabase environment variables not found, cart will stay local only');
+      setItems(mapGuestEntriesToLocalOnly(readGuestCart()));
       setLoading(false);
+      clearTimeout(safetyTimeout);
       return;
     }
 
     try {
-      const client = createClient();
+      const client = createClient(supabaseUrl, supabaseAnonKey);
       setSupabase(client);
     } catch (error) {
       console.error('Failed to initialize Supabase client for cart:', error);
+      setItems(mapGuestEntriesToLocalOnly(readGuestCart()));
       setLoading(false);
+      clearTimeout(safetyTimeout);
     }
+
+    return () => clearTimeout(safetyTimeout);
   }, []);
 
   useEffect(() => {
@@ -435,10 +645,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const init = async () => {
       setLoading(true);
+
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const session = await getSessionSafe(supabase);
 
         if (!active) return;
 
@@ -447,7 +656,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
           if (!active) return;
           await fetchUserCart(supabase, session.user.id);
         } else {
-          await fetchGuestCart(supabase);
+          setItems(mapGuestEntriesToLocalOnly(readGuestCart()));
+          void fetchGuestCart(supabase);
+        }
+      } catch (error) {
+        console.error('Error during cart init:', error);
+        // Fallback to local cart on any error
+        if (active) {
+          setItems(mapGuestEntriesToLocalOnly(readGuestCart()));
         }
       } finally {
         if (active) {
@@ -456,20 +672,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    init();
+    void init();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!active) return;
 
-      if (session?.user) {
-        await syncGuestCartToUser(supabase, session.user.id);
-        if (!active) return;
-        await fetchUserCart(supabase, session.user.id);
-      } else {
-        await fetchGuestCart(supabase);
+      try {
+        if (session?.user) {
+          await syncGuestCartToUser(supabase, session.user.id);
+          if (!active) return;
+          await fetchUserCart(supabase, session.user.id);
+        } else {
+          setItems(mapGuestEntriesToLocalOnly(readGuestCart()));
+          void fetchGuestCart(supabase);
+        }
+      } catch (error) {
+        console.error('Error during auth change:', error);
       }
+      
       if (active) {
         setLoading(false);
       }
@@ -483,44 +705,104 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addItem = useCallback(
     async (input: AddCartItemInput) => {
-      if (!supabase) return;
-
-      const quantity = normalizeQuantity(input.quantity);
       const unitPrice = Number(input.unit_price) || 0;
+      let quantity = normalizeQuantity(input.quantity);
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.user) {
+      const upsertGuestItem = async (maxStock: number | null = null) => {
         const current = readGuestCart();
         const key = `${input.item_type}:${input.item_id}`;
         const next = [...current];
         const index = next.findIndex((entry) => localItemKey(entry) === key);
 
         if (index >= 0) {
+          const nextQuantity = normalizeQuantity(next[index].quantity + quantity);
+          if (maxStock !== null && nextQuantity > maxStock) {
+            throw new Error('Quantite demandee superieure au stock.');
+          }
           next[index] = {
             ...next[index],
-            quantity: normalizeQuantity(next[index].quantity + quantity),
+            quantity: nextQuantity,
             unit_price: unitPrice,
+            item_name: next[index].item_name || sanitizeGuestText(input.item_name),
+            item_image: next[index].item_image || sanitizeGuestImage(input.item_image),
+            produit_type: next[index].produit_type || sanitizeGuestProductType(input.produit_type),
+            is_digital:
+              typeof next[index].is_digital === 'boolean'
+                ? next[index].is_digital
+                : typeof input.is_digital === 'boolean'
+                  ? input.is_digital
+                  : null,
           };
         } else {
+          if (maxStock !== null && quantity > maxStock) {
+            throw new Error('Quantite demandee superieure au stock.');
+          }
           next.push({
             item_type: input.item_type,
             item_id: input.item_id,
             unit_price: unitPrice,
             quantity,
             added_at: new Date().toISOString(),
+            item_name: sanitizeGuestText(input.item_name),
+            item_image: sanitizeGuestImage(input.item_image),
+            produit_type: sanitizeGuestProductType(input.produit_type),
+            is_digital: typeof input.is_digital === 'boolean' ? input.is_digital : null,
           });
         }
 
         writeGuestCart(next);
-        await fetchGuestCart(supabase);
+        setItems(mapGuestEntriesToLocalOnly(next));
+        if (supabase) {
+          void fetchGuestCart(supabase);
+        }
+      };
+
+      if (!supabase) {
+        await upsertGuestItem();
         return;
       }
 
+      const session = await getSessionSafe(supabase, 1500);
+      if (!session?.user) {
+        await upsertGuestItem();
+        return;
+      }
+
+      let maxStock: number | null = null;
+
+      if (input.item_type === 'produit') {
+        const { data: product, error: productError } = await supabase
+          .from('produits')
+          .select('id,status,stock,min_order')
+          .eq('id', input.item_id)
+          .maybeSingle();
+
+        if (productError) {
+          console.error('Error validating product before cart add:', productError);
+        } else if (!product || product.status !== 'published') {
+          throw new Error('Ce produit nest plus disponible.');
+        }
+
+        if (product) {
+          const minOrder = Math.max(1, Number(product.min_order ?? 1));
+          quantity = Math.max(quantity, minOrder);
+
+          if (typeof product.stock === 'number') {
+            maxStock = Math.max(0, Math.floor(product.stock));
+            if (maxStock <= 0) {
+              throw new Error('Produit en rupture de stock.');
+            }
+            if (quantity > maxStock) {
+              throw new Error('Quantite demandee superieure au stock.');
+            }
+          }
+        }
+      }
+
       const cartId = await ensureUserCartId(supabase, session.user.id);
-      if (!cartId) return;
+      if (!cartId) {
+        throw new Error('Impossible de preparer votre panier.');
+      }
 
       const foreignField = `${input.item_type}_id` as 'produit_id' | 'formation_id' | 'video_id';
       const { data: existing, error: existingError } = await supabase
@@ -533,18 +815,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       if (existingError) {
         console.error('Error loading cart item before add:', existingError);
-        return;
+        throw new Error("Erreur pendant l'ajout au panier.");
       }
 
       if (existing?.id) {
         const nextQuantity = normalizeQuantity((existing.quantity ?? 1) + quantity);
+        if (maxStock !== null && nextQuantity > maxStock) {
+          throw new Error('Quantite demandee superieure au stock.');
+        }
         const { error } = await supabase
           .from('cart_items')
           .update({ quantity: nextQuantity, unit_price: unitPrice })
           .eq('id', existing.id);
         if (error) {
           console.error('Error updating cart item:', error);
-          return;
+          throw new Error("Erreur pendant l'ajout au panier.");
         }
       } else {
         const payload: Record<string, unknown> = {
@@ -557,7 +842,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.from('cart_items').insert(payload);
         if (error) {
           console.error('Error inserting cart item:', error);
-          return;
+          throw new Error("Erreur pendant l'ajout au panier.");
         }
       }
 
@@ -568,11 +853,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const removeItem = useCallback(
     async (itemId: string) => {
-      if (!supabase) return;
+      if (!supabase) {
+        const parsed = parseLocalItemId(itemId);
+        if (!parsed) return;
+        const next = readGuestCart().filter(
+          (entry) => localItemKey(entry) !== `${parsed.item_type}:${parsed.item_id}`,
+        );
+        writeGuestCart(next);
+        setItems(mapGuestEntriesToLocalOnly(next));
+        return;
+      }
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getSessionSafe(supabase);
 
       if (!session?.user) {
         const parsed = parseLocalItemId(itemId);
@@ -581,7 +873,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
           (entry) => localItemKey(entry) !== `${parsed.item_type}:${parsed.item_id}`,
         );
         writeGuestCart(next);
-        await fetchGuestCart(supabase);
+        setItems(mapGuestEntriesToLocalOnly(next));
+        void fetchGuestCart(supabase);
         return;
       }
 
@@ -597,7 +890,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const updateQuantity = useCallback(
     async (itemId: string, quantity: number) => {
-      if (!supabase) return;
+      if (!supabase) {
+        if (quantity <= 0) {
+          const parsed = parseLocalItemId(itemId);
+          if (!parsed) return;
+          const filtered = readGuestCart().filter(
+            (entry) => localItemKey(entry) !== `${parsed.item_type}:${parsed.item_id}`,
+          );
+          writeGuestCart(filtered);
+          setItems(mapGuestEntriesToLocalOnly(filtered));
+          return;
+        }
+
+        const parsed = parseLocalItemId(itemId);
+        if (!parsed) return;
+        const safeQuantity = normalizeQuantity(quantity);
+        const next = readGuestCart().map((entry) => {
+          if (localItemKey(entry) !== `${parsed.item_type}:${parsed.item_id}`) return entry;
+          return { ...entry, quantity: safeQuantity };
+        });
+        writeGuestCart(next);
+        setItems(mapGuestEntriesToLocalOnly(next));
+        return;
+      }
 
       if (quantity <= 0) {
         await removeItem(itemId);
@@ -605,9 +920,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
 
       const safeQuantity = normalizeQuantity(quantity);
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getSessionSafe(supabase);
 
       if (!session?.user) {
         const parsed = parseLocalItemId(itemId);
@@ -618,7 +931,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
           return { ...entry, quantity: safeQuantity };
         });
         writeGuestCart(next);
-        await fetchGuestCart(supabase);
+        setItems(mapGuestEntriesToLocalOnly(next));
+        void fetchGuestCart(supabase);
         return;
       }
 
@@ -638,15 +952,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 
   const clearCart = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase) {
+      clearGuestCartStorage();
+      setItems([]);
+      return;
+    }
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const session = await getSessionSafe(supabase);
 
     if (!session?.user) {
       clearGuestCartStorage();
-      await fetchGuestCart(supabase);
+      setItems([]);
+      void fetchGuestCart(supabase);
       return;
     }
 
@@ -662,14 +979,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     await fetchUserCart(supabase, session.user.id);
   }, [supabase, fetchGuestCart, fetchUserCart]);
 
-  const itemCount = items.reduce((sum, item) => sum + normalizeQuantity(item.quantity), 0);
-  const totalPrice = items.reduce(
+  const itemCount = items?.reduce((sum, item) => sum + normalizeQuantity(item.quantity), 0) ?? 0;
+  const totalPrice = items?.reduce(
     (sum, item) => sum + Number(item.unit_price || 0) * normalizeQuantity(item.quantity),
     0,
-  );
+  ) ?? 0;
 
   const value: CartContextType = {
-    items,
+    items: items ?? [],
     loading,
     itemCount,
     totalPrice,

@@ -43,7 +43,7 @@ export default function FormationCard({
       <Card className="group overflow-hidden border-slate-200/60 bg-white transition-all duration-500 hover:shadow-2xl">
         <div className="relative aspect-video overflow-hidden">
           <Image
-            src={formation.thumbnail_url || "/images/placeholder-formation.jpg"}
+            src={formation.thumbnail_url || "/images/placeholder-formation.svg"}
             alt={formation.title}
             fill
             className="object-cover transition-transform duration-700 group-hover:scale-105"

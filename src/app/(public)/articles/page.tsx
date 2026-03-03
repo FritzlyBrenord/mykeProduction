@@ -1,228 +1,240 @@
 "use client";
 
-import { useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Filter, Sparkles, X } from "lucide-react";
-import { Article } from "@/lib/types";
+import { Search, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
 import ArticleCard from "@/components/cards/ArticleCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { getCategoryLabel } from "@/lib/constants/articles";
+import { Article } from "@/lib/types";
 
-const mockArticles: Article[] = [
-  {
-    id: "1",
-    title: "Les nouvelles réglementations REACH 2024 : ce qui change",
-    slug: "nouvelles-reglementations-reach-2024",
-    excerpt:
-      "Analyse des dernières modifications du règlement REACH et leur impact sur les industries chimiques européennes.",
-    content: "...",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800",
-    status: "published",
-    category_id: "1",
-    published_at: "2024-02-20",
-    view_count: 1250,
-    reading_time: 8,
-    allow_comments: true,
-    created_at: "2024-02-20",
-    updated_at: "2024-02-20",
-    category: {
-      id: "1",
-      name: "Réglementation",
-      slug: "reglementation",
-      type: "article",
-    },
-  },
-  {
-    id: "2",
-    title: "L'hydrolyse acide : mécanismes et applications industrielles",
-    slug: "hydrolyse-acide-mecanismes-applications",
-    excerpt:
-      "Comprendre les mécanismes de l'hydrolyse acide et ses nombreuses applications dans l'industrie chimique.",
-    content: "...",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?w=800",
-    status: "published",
-    category_id: "2",
-    published_at: "2024-02-15",
-    view_count: 890,
-    reading_time: 12,
-    allow_comments: true,
-    created_at: "2024-02-15",
-    updated_at: "2024-02-15",
-    category: { id: "2", name: "Chimie", slug: "chimie", type: "article" },
-  },
-  {
-    id: "3",
-    title: "Industrie 4.0 : transformation digitale des usines",
-    slug: "industrie-4-0-transformation-digitale",
-    excerpt:
-      "Comment l'Industrie 4.0 révolutionne les processus de production et la gestion des usines modernes.",
-    content: "...",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1565514020176-db9e1b95da24?w=800",
-    status: "published",
-    category_id: "3",
-    published_at: "2024-02-10",
-    view_count: 2100,
-    reading_time: 10,
-    allow_comments: true,
-    created_at: "2024-02-10",
-    updated_at: "2024-02-10",
-    category: {
-      id: "3",
-      name: "Technologie",
-      slug: "technologie",
-      type: "article",
-    },
-  },
-  {
-    id: "4",
-    title: "Gestion des déchets chimiques : meilleures pratiques",
-    slug: "gestion-dechets-chimiques-pratiques",
-    excerpt:
-      "Guide complet pour la gestion responsable et conforme des déchets chimiques en entreprise.",
-    content: "...",
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=800",
-    status: "published",
-    category_id: "4",
-    published_at: "2024-02-05",
-    view_count: 756,
-    reading_time: 15,
-    allow_comments: true,
-    created_at: "2024-02-05",
-    updated_at: "2024-02-05",
-    category: {
-      id: "4",
-      name: "Environnement",
-      slug: "environnement",
-      type: "article",
-    },
-  },
-];
+type PublicArticle = Article & {
+  categories?: string[];
+  comment_count?: number;
+};
 
-const categories = [
-  "Toutes",
-  "Réglementation",
-  "Chimie",
-  "Technologie",
-  "Environnement",
-];
+function normalizeText(value: string | null | undefined) {
+  return (value ?? "").toLowerCase();
+}
+
+function articleCategoryLabels(article: PublicArticle) {
+  const fromArray = (article.categories ?? []).map((categoryId) =>
+    getCategoryLabel(categoryId),
+  );
+  const fromMain = article.category?.name ? [article.category.name] : [];
+  return Array.from(new Set([...fromArray, ...fromMain]));
+}
 
 export default function ArticlesPage() {
+  const [articles, setArticles] = useState<PublicArticle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Toutes");
 
-  const filteredArticles = mockArticles.filter((article) => {
-    const matchesSearch =
-      article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      article.excerpt?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      selectedCategory === "Toutes" ||
-      article.category?.name === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  useEffect(() => {
+    let active = true;
 
-  const featuredArticle = filteredArticles[0];
-  const otherArticles = filteredArticles.slice(1);
+    const fetchArticles = async () => {
+      try {
+        setLoading(true);
+        setErrorMessage(null);
+
+        const response = await fetch("/api/articles?limit=200", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Impossible de charger les articles.");
+        }
+
+        const data = (await response.json()) as PublicArticle[];
+        if (!active) return;
+        setArticles(Array.isArray(data) ? data : []);
+      } catch {
+        if (!active) return;
+        setErrorMessage("Impossible de recuperer les articles pour le moment.");
+        setArticles([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchArticles();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const categories = useMemo(() => {
+    const labels = articles.flatMap((article) => articleCategoryLabels(article));
+    const unique = Array.from(new Set(labels)).sort((a, b) => a.localeCompare(b));
+    return ["Toutes", ...unique];
+  }, [articles]);
+
+  const filteredArticles = useMemo(() => {
+    const search = normalizeText(searchQuery.trim());
+
+    return articles.filter((article) => {
+      const title = normalizeText(article.title);
+      const excerpt = normalizeText(article.excerpt);
+      const labels = articleCategoryLabels(article);
+
+      const matchesSearch =
+        !search || title.includes(search) || excerpt.includes(search);
+      const matchesCategory =
+        selectedCategory === "Toutes" || labels.includes(selectedCategory);
+
+      return matchesSearch && matchesCategory;
+    });
+  }, [articles, searchQuery, selectedCategory]);
+
+  const featuredArticle =
+    !searchQuery.trim() && selectedCategory === "Toutes"
+      ? filteredArticles[0]
+      : null;
+
+  const gridArticles = featuredArticle
+    ? filteredArticles.slice(1)
+    : filteredArticles;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-28">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8f3e8_0%,#fcfaf5_35%,#ffffff_100%)]">
+      <section className="relative overflow-hidden border-b border-amber-200/60 pt-28">
+        <div className="pointer-events-none absolute -top-16 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-amber-300/20 blur-3xl" />
+        <div className="pointer-events-none absolute right-12 top-24 h-32 w-32 rounded-full border border-amber-300/40" />
+
+        <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8 lg:pb-16">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
+            className="max-w-4xl"
           >
-            <div className="flex items-center gap-2 text-amber-600 mb-2">
-              <Sparkles className="h-5 w-5" />
-              <span className="font-medium uppercase tracking-wider text-sm">
-                Blog
-              </span>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-white/70 px-4 py-1 text-xs uppercase tracking-[0.22em] text-amber-900">
+              <Sparkles className="h-3.5 w-3.5" />
+              Journal Myke Industrie
             </div>
-            <h1 className="font-[family-name:var(--font-playfair)] text-4xl lg:text-5xl font-semibold text-slate-900">
-              Nos articles
+
+            <h1 className="font-[family-name:var(--font-playfair)] text-4xl font-semibold leading-tight text-slate-900 md:text-6xl">
+              L&apos;edition classique des idees et de l&apos;industrie
             </h1>
-            <p className="text-slate-600 mt-3 max-w-2xl text-lg">
-              Actualités, analyses et conseils d'experts sur l'industrie et la
-              chimie.
+
+            <p
+              className="mt-5 max-w-3xl text-lg leading-relaxed text-slate-600"
+              style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+            >
+              Retrouvez des analyses de fond, des chroniques techniques et des retours terrain,
+              presentes dans une experience de lecture premium, claire et intemporelle.
             </p>
+
+            <div className="mt-8 flex flex-wrap items-center gap-6 text-sm text-slate-600">
+              <div>
+                <span className="font-[family-name:var(--font-playfair)] text-3xl text-slate-900">{articles.length}</span>
+                <p>articles publies</p>
+              </div>
+              <div className="h-10 w-px bg-amber-300/70" />
+              <div>
+                <span className="font-[family-name:var(--font-playfair)] text-3xl text-slate-900">{Math.max(categories.length - 1, 0)}</span>
+                <p>rubriques</p>
+              </div>
+            </div>
           </motion.div>
         </div>
-      </div>
+      </section>
 
-      {/* Search & Filters */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Rechercher un article..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-amber-200/70 bg-white/80 p-4 shadow-lg shadow-amber-900/5 backdrop-blur md:p-5"
+        >
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="Rechercher un article, un sujet, une idee..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-11 border-amber-200/80 bg-white pl-10"
+              />
+            </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {categories.map((cat) => (
-              <Button
-                key={cat}
-                variant={selectedCategory === cat ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedCategory(cat)}
-                className="whitespace-nowrap"
-              >
-                {cat}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {/* Results */}
-        {filteredArticles.length > 0 ? (
-          <div className="space-y-8">
-            {/* Featured Article */}
-            {featuredArticle &&
-              !searchQuery &&
-              selectedCategory === "Toutes" && (
-                <div className="mb-8">
-                  <ArticleCard article={featuredArticle} variant="featured" />
-                </div>
-              )}
-
-            {/* Other Articles Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {(searchQuery || selectedCategory !== "Toutes"
-                ? filteredArticles
-                : otherArticles
-              ).map((article, index) => (
-                <ArticleCard key={article.id} article={article} index={index} />
-              ))}
+            <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0">
+              {categories.map((categoryName) => {
+                const active = selectedCategory === categoryName;
+                return (
+                  <Button
+                    key={categoryName}
+                    variant={active ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedCategory(categoryName)}
+                    className={`whitespace-nowrap ${
+                      active
+                        ? "bg-slate-900 text-amber-100 hover:bg-slate-800"
+                        : "border-amber-200 text-slate-700 hover:bg-amber-50"
+                    }`}
+                  >
+                    {categoryName}
+                  </Button>
+                );
+              })}
             </div>
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <Sparkles className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-            <h3 className="font-[family-name:var(--font-playfair)] text-lg font-medium text-slate-900 mb-2">
-              Aucun article trouvé
+        </motion.div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+        {loading ? (
+          <div className="rounded-2xl border border-amber-200/60 bg-white/80 p-10 text-center text-slate-500">
+            Chargement des articles...
+          </div>
+        ) : errorMessage ? (
+          <div className="rounded-2xl border border-red-200 bg-white p-10 text-center">
+            <h3 className="font-[family-name:var(--font-playfair)] text-2xl font-semibold text-slate-900">
+              Erreur de chargement
             </h3>
-            <p className="text-slate-500">
-              Essayez de modifier votre recherche
-            </p>
+            <p className="mt-2 text-slate-500">{errorMessage}</p>
+            <Button className="mt-4" variant="outline" onClick={() => window.location.reload()}>
+              Reessayer
+            </Button>
+          </div>
+        ) : filteredArticles.length === 0 ? (
+          <div className="rounded-2xl border border-amber-200/60 bg-white/80 p-10 text-center">
+            <h3 className="font-[family-name:var(--font-playfair)] text-2xl font-semibold text-slate-900">
+              Aucun article trouve
+            </h3>
+            <p className="mt-2 text-slate-500">Essayez une autre recherche ou une autre rubrique.</p>
+          </div>
+        ) : (
+          <div className="space-y-10">
+            {featuredArticle && (
+              <div>
+                <ArticleCard article={featuredArticle} variant="featured" />
+              </div>
+            )}
+
+            {gridArticles.length > 0 && (
+              <div>
+                <div className="mb-5 flex items-center justify-between">
+                  <h2 className="font-[family-name:var(--font-playfair)] text-2xl font-semibold text-slate-900">
+                    Dernieres publications
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {gridArticles.map((article, index) => (
+                    <ArticleCard key={article.id} article={article} index={index} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

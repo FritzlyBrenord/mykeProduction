@@ -10,6 +10,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  orderItemProgressPercent,
+  orderItemStatusLabel,
+  orderProgressPercent,
+} from '@/lib/orders/tracking';
 import { formatDate, formatPrice } from '@/lib/utils/format';
 import { motion } from 'framer-motion';
 import {
@@ -30,6 +35,12 @@ import { toast } from 'sonner';
 interface OrderItem {
   id: string;
   item_type: 'produit' | 'formation' | 'video';
+  item_status: string;
+  authorized_at?: string | null;
+  processing_at?: string | null;
+  shipped_at?: string | null;
+  delivered_at?: string | null;
+  cancelled_at?: string | null;
   quantity: number;
   unit_price: number;
   total_price: number;
@@ -49,7 +60,16 @@ interface Order {
   total_amount: number;
   currency: string;
   shipping_address: Record<string, unknown> | null;
+  estimated_delivery_at?: string | null;
   payment_method: 'stripe' | 'paypal' | null;
+  payment?: {
+    id: string;
+    provider: 'stripe' | 'paypal';
+    status: string | null;
+    amount: number;
+    metadata: Record<string, unknown> | null;
+    created_at: string;
+  } | null;
   created_at: string;
   items: OrderItem[];
 }
@@ -69,7 +89,7 @@ const statusConfig: Record<
     icon: CreditCard,
   },
   processing: {
-    label: 'En traitement',
+    label: 'En preparation',
     className: 'bg-amber-100 text-amber-800 border-amber-200',
     icon: Package,
   },
@@ -93,16 +113,6 @@ const statusConfig: Record<
     className: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200',
     icon: CreditCard,
   },
-};
-
-const statusProgress: Record<string, number> = {
-  pending: 15,
-  paid: 35,
-  processing: 55,
-  shipped: 80,
-  delivered: 100,
-  cancelled: 100,
-  refunded: 100,
 };
 
 function orderStatusBadge(status: string) {
@@ -147,6 +157,16 @@ function itemTypeBadge(item: OrderItem) {
 
 function shortOrderId(orderId: string) {
   return `#${orderId.slice(0, 8)}`;
+}
+
+function itemStatusClass(status: string) {
+  if (status === 'paid') return 'bg-blue-100 text-blue-700 border-blue-200';
+  if (status === 'processing') return 'bg-amber-100 text-amber-800 border-amber-200';
+  if (status === 'shipped') return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+  if (status === 'delivered') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  if (status === 'cancelled') return 'bg-red-100 text-red-700 border-red-200';
+  if (status === 'refunded') return 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200';
+  return 'bg-slate-100 text-slate-700 border-slate-200';
 }
 
 function formationProgressLabel(
@@ -201,7 +221,9 @@ export default function OrdersPage() {
     const formationPending = orders
       .flatMap((order) => order.items || [])
       .filter(
-        (item) => item.item_type === 'formation' && item.formation_authorized === false,
+        (item) =>
+          item.item_type === 'formation' &&
+          (item.formation_authorized === false || item.item_status === 'paid'),
       ).length;
     return { total, processing, delivered, formationPending };
   }, [orders]);
@@ -280,12 +302,24 @@ export default function OrdersPage() {
                         <p className="text-sm text-slate-600 mt-1">
                           Passee le {formatDate(order.created_at)}
                         </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Livraison prevue:{' '}
+                          {order.estimated_delivery_at
+                            ? formatDate(order.estimated_delivery_at)
+                            : 'a definir par ladministration'}
+                        </p>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <p className="text-lg font-semibold text-slate-900">
                           {formatPrice(order.total_amount, order.currency || 'USD')}
                         </p>
+                        <Link href={`/compte/commandes/${order.id}`}>
+                          <Button variant="outline">
+                            <Package className="h-4 w-4 mr-2" />
+                            Suivre
+                          </Button>
+                        </Link>
                         <Dialog>
                           <DialogTrigger asChild>
                             <Button variant="outline">
@@ -308,9 +342,7 @@ export default function OrdersPage() {
                                   <div
                                     className="h-full rounded-full bg-blue-600 transition-all"
                                     style={{
-                                      width: `${
-                                        statusProgress[order.status] ?? statusProgress.pending
-                                      }%`,
+                                      width: `${orderProgressPercent(order.status)}%`,
                                     }}
                                   />
                                 </div>
@@ -325,6 +357,9 @@ export default function OrdersPage() {
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2 mb-1">
                                         {itemTypeBadge(item)}
+                                        <Badge className={`${itemStatusClass(item.item_status)} border`}>
+                                          {orderItemStatusLabel(item.item_status)}
+                                        </Badge>
                                         {item.item_type === 'formation' &&
                                           (item.formation_authorized ? (
                                             <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
@@ -351,6 +386,14 @@ export default function OrdersPage() {
                                           )}
                                         </p>
                                       )}
+                                      <div className="h-1.5 mt-2 rounded-full bg-slate-200 overflow-hidden max-w-[220px]">
+                                        <div
+                                          className="h-full rounded-full bg-blue-600 transition-all"
+                                          style={{
+                                            width: `${orderItemProgressPercent(item.item_status)}%`,
+                                          }}
+                                        />
+                                      </div>
                                     </div>
                                     <p className="font-semibold text-slate-900">
                                       {formatPrice(item.total_price, order.currency || 'USD')}
@@ -360,6 +403,21 @@ export default function OrdersPage() {
                               </div>
 
                               <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="flex justify-between text-sm text-slate-700">
+                                  <span>Paiement</span>
+                                  <span className="capitalize">
+                                    {(order.payment?.provider || order.payment_method || 'N/A')} -{' '}
+                                    {(order.payment?.status || 'pending')}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm text-slate-700">
+                                  <span>Livraison prevue</span>
+                                  <span>
+                                    {order.estimated_delivery_at
+                                      ? formatDate(order.estimated_delivery_at)
+                                      : 'A definir'}
+                                  </span>
+                                </div>
                                 <div className="flex justify-between text-sm text-slate-700">
                                   <span>Sous-total</span>
                                   <span>{formatPrice(order.subtotal, order.currency || 'USD')}</span>
@@ -406,6 +464,11 @@ export default function OrdersPage() {
                           {itemTypeBadge(item)}
                           <span className="text-sm text-slate-700 truncate max-w-[220px]">
                             {itemLabel(item)}
+                          </span>
+                          <span
+                            className={`text-xs font-medium px-2 py-0.5 rounded-full border ${itemStatusClass(item.item_status)}`}
+                          >
+                            {orderItemStatusLabel(item.item_status)}
                           </span>
                           {item.item_type === 'formation' && !item.formation_authorized && (
                             <span className="text-xs text-amber-700 font-medium">

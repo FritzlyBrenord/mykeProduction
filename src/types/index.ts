@@ -86,6 +86,7 @@ export interface Article {
   excerpt: string | null;
   content: string;
   thumbnail_url: string | null;
+  thumbnail_storage_path?: string | null;
   status: 'draft' | 'published' | 'scheduled' | 'archived';
   category_id: string | null;
   author_id: string | null;
@@ -217,12 +218,17 @@ export interface Video {
   video_url: string | null;
   video_type: 'upload' | 'youtube' | 'vimeo';
   thumbnail_url: string | null;
+  description?: string | null;
   access_type: 'public' | 'members' | 'paid';
   price: number;
   status: 'published' | 'draft' | 'archived';
   category_id: string | null;
   playlist_id: string | null;
   view_count: number;
+  allow_comments?: boolean;
+  likes?: number;
+  like_count?: number;
+  comment_count?: number;
   deleted_at: string | null;
   created_at: string;
   category?: Category;

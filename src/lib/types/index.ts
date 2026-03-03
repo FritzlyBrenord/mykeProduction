@@ -198,6 +198,10 @@ export interface Video {
   view_count: number;
   thumbnail_url: string | null;
   description: string | null;
+  allow_comments?: boolean;
+  likes?: number;
+  like_count?: number;
+  comment_count?: number;
   created_at: string;
   category?: Category;
 }

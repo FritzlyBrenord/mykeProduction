@@ -118,8 +118,27 @@ export default function AuthCallback() {
           console.error("Unable to update last_login_at:", loginUpdateError);
         }
 
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role,is_active,deleted_at")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profile && (profile.is_active === false || Boolean(profile.deleted_at))) {
+          await supabase.auth.signOut();
+          toast.error("Compte desactive. Contactez un administrateur.");
+          router.replace("/auth/connexion?blocked=1");
+          return;
+        }
+
+        const metadataRole =
+          (user.app_metadata?.role as "admin" | "client" | undefined) ??
+          (user.user_metadata?.role as "admin" | "client" | undefined);
+        const role =
+          profile?.role === "admin" || metadataRole === "admin" ? "admin" : "client";
+
         toast.success("Connexion Google reussie.");
-        router.replace("/");
+        router.replace(role === "admin" ? "/admin/dashboard" : "/");
       } catch (error) {
         console.error("OAuth callback exception:", error);
         toast.error("Une erreur est survenue pendant la connexion Google.");

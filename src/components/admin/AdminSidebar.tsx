@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { createClient } from "@/lib/supabase/client";
 
 interface NavItem {
   label: string;
@@ -212,6 +213,25 @@ export default function AdminSidebar() {
   const { isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen } =
     useSidebar();
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Admin sign out error:", error);
+    } finally {
+      setIsMobileOpen(false);
+      router.replace("/auth/connexion");
+      router.refresh();
+      setIsSigningOut(false);
+    }
+  };
 
   return (
     <>
@@ -304,13 +324,19 @@ export default function AdminSidebar() {
 
           {/* Logout */}
           <button
+            onClick={() => void handleSignOut()}
+            disabled={isSigningOut}
             className={cn(
-              "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-red-500 hover:bg-red-500/10 w-full",
+              "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-red-500 hover:bg-red-500/10 w-full disabled:opacity-60 disabled:cursor-not-allowed",
               isCollapsed && "justify-center px-2",
             )}
           >
             <LogOut className="w-5 h-5" />
-            {!isCollapsed && <span className="font-medium">Déconnexion</span>}
+            {!isCollapsed && (
+              <span className="font-medium">
+                {isSigningOut ? "Déconnexion..." : "Déconnexion"}
+              </span>
+            )}
           </button>
 
           {/* Collapse Toggle (Desktop only) */}

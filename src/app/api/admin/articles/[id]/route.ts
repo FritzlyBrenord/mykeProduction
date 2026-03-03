@@ -39,25 +39,44 @@ export async function PUT(
         const { id } = await params;
         const body = await request.json();
 
-        const { data, error } = await supabaseAdmin
+        const baseUpdateData = {
+            title: body.title,
+            slug: body.slug,
+            excerpt: body.excerpt,
+            content: body.content,
+            thumbnail_url: body.thumbnail_url,
+            status: body.status,
+            category_id: null,
+            seo_title: body.seo_title,
+            seo_description: body.seo_description,
+            allow_comments: body.allow_comments,
+            published_at: body.status === 'published' ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+        };
+
+        let data: any = null;
+        let error: any = null;
+
+        // Backward-compatible update:
+        // if migration 010 is not applied yet, retry without thumbnail_storage_path.
+        ({ data, error } = await supabaseAdmin
             .from('articles')
             .update({
-                title: body.title,
-                slug: body.slug,
-                excerpt: body.excerpt,
-                content: body.content,
-                thumbnail_url: body.thumbnail_url,
-                status: body.status,
-                category_id: null,
-                seo_title: body.seo_title,
-                seo_description: body.seo_description,
-                allow_comments: body.allow_comments,
-                published_at: body.status === 'published' ? new Date().toISOString() : null,
-                updated_at: new Date().toISOString(),
+                ...baseUpdateData,
+                thumbnail_storage_path: body.thumbnail_storage_path || null,
             })
             .eq('id', id)
             .select()
-            .single();
+            .single());
+
+        if (error?.code === '42703') {
+            ({ data, error } = await supabaseAdmin
+                .from('articles')
+                .update(baseUpdateData)
+                .eq('id', id)
+                .select()
+                .single());
+        }
 
         if (error) throw error;
 

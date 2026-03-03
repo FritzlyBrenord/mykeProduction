@@ -44,7 +44,7 @@ export default function LatestVideos({ videos }: LatestVideosProps) {
 
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-          {videos.slice(0, 3).map((video, index) => (
+          {videos.slice(0, 6).map((video, index) => (
             <VideoCard key={video.id} video={video} index={index} />
           ))}
         </div>

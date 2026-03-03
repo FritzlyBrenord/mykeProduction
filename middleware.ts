@@ -17,33 +17,43 @@ function isAdminFromMetadata(user: User | null) {
   }
 
   const appRole = roleFromMetadata(user.app_metadata);
-  const userRole = roleFromMetadata(user.user_metadata);
-  return appRole === "admin" || userRole === "admin";
+  return appRole === "admin";
 }
 
-async function isAdminUser(
+async function getUserProfileAccess(
   user: User | null,
   supabase: ReturnType<typeof createServerClient>,
 ) {
   if (!user) {
-    return false;
-  }
-
-  if (isAdminFromMetadata(user)) {
-    return true;
+    return { role: null as string | null, isActive: true };
   }
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role,is_active,deleted_at")
     .eq("id", user.id)
     .maybeSingle();
 
   if (error) {
-    return false;
+    return {
+      role: isAdminFromMetadata(user) ? "admin" : null,
+      isActive: true,
+    };
   }
 
-  return profile?.role === "admin";
+  const profileRole = typeof profile?.role === "string" ? profile.role : null;
+  const effectiveRole =
+    profileRole === "admin" || isAdminFromMetadata(user)
+      ? "admin"
+      : profileRole;
+
+  return {
+    role: effectiveRole,
+    isActive:
+      profile == null
+        ? true
+        : profile.is_active !== false && !profile.deleted_at,
+  };
 }
 
 function isLearningRoute(pathname: string) {
@@ -59,18 +69,34 @@ function getFormationPath(pathname: string) {
   return "/formations";
 }
 
-function redirectToLogin(request: NextRequest) {
-  return NextResponse.redirect(new URL("/auth/connexion", request.url));
+function redirectToLogin(
+  request: NextRequest,
+  options?: { includeNext?: boolean; blocked?: boolean },
+) {
+  const loginUrl = new URL("/auth/connexion", request.url);
+
+  if (options?.includeNext) {
+    loginUrl.searchParams.set(
+      "next",
+      `${request.nextUrl.pathname}${request.nextUrl.search}`,
+    );
+  }
+
+  if (options?.blocked) {
+    loginUrl.searchParams.set("blocked", "1");
+  }
+
+  return NextResponse.redirect(loginUrl);
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  const isApiRoute = pathname.startsWith("/api/");
   const isAdminRoute = pathname.startsWith("/admin");
   const isApiAdminRoute = pathname.startsWith("/api/admin");
   const isAccountRoute = pathname.startsWith("/compte");
   const isCheckoutRoute = pathname.startsWith("/checkout");
-  const isCartRoute = pathname === "/boutique/panier";
   const isFormationLearningRoute = isLearningRoute(pathname);
 
   const requiresAuth =
@@ -78,7 +104,6 @@ export async function middleware(request: NextRequest) {
     isApiAdminRoute ||
     isAccountRoute ||
     isCheckoutRoute ||
-    isCartRoute ||
     isFormationLearningRoute;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -90,14 +115,17 @@ export async function middleware(request: NextRequest) {
     }
 
     if (isApiAdminRoute) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Vous devez etre connecte.", code: "UNAUTHENTICATED" },
+        { status: 401 },
+      );
     }
 
     if (isFormationLearningRoute) {
       return NextResponse.redirect(new URL(getFormationPath(pathname), request.url));
     }
 
-    return redirectToLogin(request);
+    return redirectToLogin(request, { includeNext: true });
   }
 
   let response = NextResponse.next({ request });
@@ -105,40 +133,7 @@ export async function middleware(request: NextRequest) {
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
-        const allCookies = request.cookies.getAll();
-        console.log(`Middleware - Cookies bruts:`, allCookies.map(c => ({ name: c.name, length: c.value.length })));
-        
-        // Filtrer SEULEMENT les cookies problématiques OAuth, mais GARDER les cookies de session Supabase
-        const problematicPatterns = [
-            'supabase-auth-code-verifier',
-            'sb-auth-code-verifier',
-            'myke-auth-token-code-verifier',
-            'supabase.auth.codeVerifier'
-          ];
-          
-        const filteredCookies = allCookies.filter(cookie => {
-          // Garder tous les cookies de session Supabase légitimes
-          if (cookie.name.startsWith('sb-') || cookie.name.startsWith('supabase.')) {
-            // Ne filtrer que les cookies de code verifier problématiques
-            return !problematicPatterns.some(pattern => cookie.name.includes(pattern));
-          }
-          
-          // Filtrer les autres cookies problématiques
-          const isProblematic = problematicPatterns.some(pattern => 
-            cookie.name.includes(pattern) || 
-            cookie.value.length > 1000
-          );
-          
-          if (isProblematic) {
-            console.log(`Middleware - Cookie filtré: ${cookie.name} (${cookie.value.length} chars)`);
-          }
-          
-          return !isProblematic;
-        });
-        
-        console.log(`Middleware: ${filteredCookies.length}/${allCookies.length} cookies valides`);
-        console.log(`Middleware - Cookies valides:`, filteredCookies.map(c => ({ name: c.name, length: c.value.length })));
-        return filteredCookies;
+        return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
@@ -150,79 +145,93 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  // Always run auth check so Supabase can refresh session cookies on every request.
-  console.log(`Middleware - Route: ${pathname}, RequiresAuth: ${requiresAuth}`);
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  
-  console.log(`Middleware - User authenticated: ${!!user}, User ID: ${user?.id}`);
-
-  if (!requiresAuth) {
-    return response;
-  }
 
   if (!user) {
-    console.log(`Middleware - No user found, redirecting...`);
+    if (!requiresAuth) {
+      return response;
+    }
+
     if (isApiAdminRoute) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Vous devez etre connecte.", code: "UNAUTHENTICATED" },
+        { status: 401 },
+      );
     }
 
     if (isFormationLearningRoute) {
       return NextResponse.redirect(new URL(getFormationPath(pathname), request.url));
     }
 
-    return redirectToLogin(request);
+    return redirectToLogin(request, { includeNext: true });
+  }
+
+  const profileAccess = await getUserProfileAccess(user, supabase);
+  const isAdminUser = profileAccess.role === "admin";
+
+  if (!profileAccess.isActive) {
+    if (isApiAdminRoute) {
+      return NextResponse.json(
+        {
+          error: "Compte desactive. Contactez un administrateur.",
+          code: "BLOCKED",
+        },
+        { status: 403 },
+      );
+    }
+
+    return redirectToLogin(request, { blocked: true });
+  }
+
+  if (isAdminUser && !isApiRoute && !isAdminRoute) {
+    return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+  }
+
+  if (!requiresAuth) {
+    return response;
   }
 
   if (isAdminRoute || isApiAdminRoute) {
-    const admin = await isAdminUser(user, supabase);
-    if (!admin) {
+    if (!isAdminUser) {
       if (isApiAdminRoute) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        return NextResponse.json(
+          { error: "Acces admin refuse.", code: "FORBIDDEN" },
+          { status: 403 },
+        );
       }
 
-      return redirectToLogin(request);
-    }
-
-    if (isAdminRoute) {
-      const twoFaVerified = request.cookies.get("2fa_verified")?.value === "true";
-      if (!twoFaVerified) {
-        return redirectToLogin(request);
-      }
+      return NextResponse.redirect(new URL("/", request.url));
     }
   }
 
   if (isFormationLearningRoute) {
-    // Vérifier si l'utilisateur est inscrit à la formation
-    console.log(`Middleware - Checking enrollment for learning route`);
-    const slug = pathname.split('/')[2]; // Extraire le slug de /formations/[slug]/apprendre
-    
+    const slug = pathname.split("/")[2];
+
     if (slug) {
-      console.log(`Middleware - Checking enrollment for slug: ${slug}, user: ${user.id}`);
       const { data: enrollment, error: enrollmentError } = await supabase
-        .from('enrollments')
-        .select(`
+        .from("enrollments")
+        .select(
+          `
           *,
           formation:formations(id, slug, status)
-        `)
-        .eq('user_id', user.id)
-        .eq('formation.slug', slug)
+        `,
+        )
+        .eq("user_id", user.id)
+        .eq("formation.slug", slug)
         .single();
-      
-      console.log(`Middleware - Enrollment check result:`, { 
-        found: !!enrollment, 
-        error: enrollmentError?.message,
-        formationStatus: enrollment?.formation?.status 
-      });
-      
-      // Si non inscrit ou formation non publiée, rediriger vers la page de la formation
-      if (enrollmentError || !enrollment || !enrollment.formation || enrollment.formation.status !== 'published') {
-        console.log(`Middleware - Enrollment check failed, redirecting to formation page`);
+
+      if (
+        enrollmentError ||
+        !enrollment ||
+        !enrollment.formation ||
+        enrollment.formation.status !== "published"
+      ) {
         return NextResponse.redirect(new URL(`/formations/${slug}`, request.url));
       }
     }
-    
+
     return response;
   }
 
@@ -230,5 +239,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!api/|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+    "/admin/:path*",
+    "/api/admin/:path*",
+  ],
 };

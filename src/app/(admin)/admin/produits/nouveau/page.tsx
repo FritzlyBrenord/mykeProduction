@@ -56,7 +56,7 @@ export default function NouveauProduitPage() {
     unit: "unite",
     is_digital: false,
     category_id: "",
-    status: "draft",
+    status: "published",
     featured: false,
     // Chemical specific
     cas_number: "",

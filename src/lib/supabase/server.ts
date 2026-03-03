@@ -10,32 +10,7 @@ export async function createClient() {
   return createServerClient<Database>(url, anonKey, {
     cookies: {
       getAll() {
-        const allCookies = cookieStore.getAll();
-        
-        // Filtrer SEULEMENT les cookies problématiques OAuth, mais GARDER les cookies de session Supabase
-        const problematicPatterns = [
-            'supabase-auth-code-verifier',
-            'sb-auth-code-verifier',
-            'myke-auth-token-code-verifier',
-            'supabase.auth.codeVerifier'
-          ];
-          
-        const filteredCookies = allCookies.filter(cookie => {
-          // Garder tous les cookies de session Supabase légitimes
-          if (cookie.name.startsWith('sb-') || cookie.name.startsWith('supabase.')) {
-            // Ne filtrer que les cookies de code verifier problématiques
-            return !problematicPatterns.some(pattern => cookie.name.includes(pattern));
-          }
-          
-          // Filtrer les autres cookies problématiques
-          return !problematicPatterns.some(pattern => 
-            cookie.name.includes(pattern) || 
-            cookie.value.length > 1000
-          );
-        });
-        
-        console.log(`Server Supabase: ${filteredCookies.length}/${allCookies.length} cookies valides`);
-        return filteredCookies;
+        return cookieStore.getAll();
       },
       setAll(cookiesToSet) {
         try {

@@ -32,6 +32,34 @@ function buildFormationPayload(body: any) {
   return payload;
 }
 
+async function getEnrollmentCountByFormationIds(formationIds: string[]) {
+  if (formationIds.length === 0) {
+    return new Map<string, number>();
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('enrollments')
+    .select('formation_id,user_id')
+    .in('formation_id', formationIds);
+
+  if (error) throw error;
+
+  const userIdsByFormation = new Map<string, Set<string>>();
+  for (const row of (data || []) as Array<{ formation_id: string | null; user_id: string | null }>) {
+    if (!row.formation_id || !row.user_id) continue;
+    const users = userIdsByFormation.get(row.formation_id) || new Set<string>();
+    users.add(row.user_id);
+    userIdsByFormation.set(row.formation_id, users);
+  }
+
+  const counts = new Map<string, number>();
+  for (const formationId of formationIds) {
+    counts.set(formationId, userIdsByFormation.get(formationId)?.size || 0);
+  }
+
+  return counts;
+}
+
 // GET /api/admin/formations - List all formations
 export async function GET(request: NextRequest) {
   try {
@@ -82,7 +110,16 @@ export async function GET(request: NextRequest) {
         })
       );
 
-      return NextResponse.json(formations);
+      const enrollmentCounts = await getEnrollmentCountByFormationIds(
+        formations.map((formation: any) => formation.id),
+      );
+
+      return NextResponse.json(
+        formations.map((formation: any) => ({
+          ...formation,
+          enrolled_count: enrollmentCounts.get(formation.id) || 0,
+        })),
+      );
     }
 
     console.warn('Formations relation select failed, fallback to plain select:', withRelations.error.message);
@@ -104,7 +141,15 @@ export async function GET(request: NextRequest) {
       moduleCount: 0, 
       lessonCount: 0 
     }));
-    return NextResponse.json(formations);
+    const enrollmentCounts = await getEnrollmentCountByFormationIds(
+      formations.map((formation: any) => formation.id),
+    );
+    return NextResponse.json(
+      formations.map((formation: any) => ({
+        ...formation,
+        enrolled_count: enrollmentCounts.get(formation.id) || 0,
+      })),
+    );
   } catch (error: any) {
     console.error('Formations fetch error:', error);
     return NextResponse.json(

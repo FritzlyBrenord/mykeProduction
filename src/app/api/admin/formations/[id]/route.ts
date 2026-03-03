@@ -110,8 +110,15 @@ async function getFormationGraph(id: string) {
 
   if (enrollmentsError) throw enrollmentsError;
 
+  const enrolledUserIds = new Set(
+    ((enrollments || []) as Array<{ user_id: string | null }>)
+      .map((enrollment) => enrollment.user_id)
+      .filter((userId): userId is string => Boolean(userId)),
+  );
+
   return {
     ...formation,
+    enrolled_count: enrolledUserIds.size,
     modules: modulesWithLessons,
     enrollments: enrollments || [],
   };

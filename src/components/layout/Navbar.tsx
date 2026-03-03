@@ -41,6 +41,7 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isPastHero, setIsPastHero] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut } = useAuth();
@@ -80,9 +81,25 @@ export default function Navbar() {
     ? "text-amber-600"
     : "text-amber-400/80";
   const handleSignOut = async () => {
-    await signOut();
-    router.push("/auth/connexion");
-    router.refresh();
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+
+    try {
+      await fetch("/api/auth/signout", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+      });
+      await signOut();
+      router.refresh();
+    } catch (error) {
+      console.error("Navbar sign out error:", error);
+    } finally {
+      setIsMobileMenuOpen(false);
+      router.replace("/auth/connexion");
+      router.refresh();
+      setIsSigningOut(false);
+    }
   };
 
   return (
@@ -275,11 +292,15 @@ export default function Navbar() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-slate-700/50" />
                   <DropdownMenuItem
-                    onClick={handleSignOut}
-                    className="text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer py-2.5"
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      void handleSignOut();
+                    }}
+                    disabled={isSigningOut}
+                    className="text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer py-2.5 disabled:opacity-60"
                   >
                     <LogOut className="mr-2 h-4 w-4" />
-                    Se déconnecter
+                    {isSigningOut ? "Deconnexion..." : "Se deconnecter"}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

@@ -23,6 +23,7 @@ type SignInCode =
   | 'EMAIL_NOT_VERIFIED'
   | 'INVALID_CREDENTIALS'
   | 'LOCKED_OUT'
+  | 'ACCOUNT_BLOCKED'
   | 'UNKNOWN';
 
 type SignUpCode = 'EMAIL_EXISTS' | 'RATE_LIMITED' | 'UNKNOWN';
@@ -246,15 +247,48 @@ function isInvalidCredentialsError(message: string) {
   );
 }
 
+function isAuthSessionMissingError(error: unknown) {
+  if (!error) return false;
+  const candidate = error as { message?: string; name?: string; code?: string };
+  const message = String(candidate.message || '').toLowerCase();
+  const name = String(candidate.name || '').toLowerCase();
+  const code = String(candidate.code || '').toLowerCase();
+
+  return (
+    message.includes('auth session missing') ||
+    name.includes('authsessionmissingerror') ||
+    code.includes('auth_session_missing')
+  );
+}
+
 function roleFromMetadata(metadata: unknown): 'client' | 'admin' {
   if (!metadata || typeof metadata !== 'object') return 'client';
   const role = (metadata as Record<string, unknown>).role;
   return role === 'admin' ? 'admin' : 'client';
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+interface ServerProfilePayload {
+  id: string;
+  email: string;
+  fullName: string | null;
+  avatarUrl: string | null;
+  role: 'client' | 'admin';
+  isActive: boolean;
+  deletedAt: string | null;
+  phone: string | null;
+  country: string | null;
+  bio: string | null;
+  createdAt: string | null;
+}
+
+interface AuthProviderProps {
+  children: ReactNode;
+  initialUser?: User | null;
+}
+
+export function AuthProvider({ children, initialUser = null }: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(initialUser);
+  const [loading, setLoading] = useState(!initialUser);
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
@@ -288,15 +322,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabase) return;
 
     try {
+      const fetchFromServerProfile = async () => {
+        try {
+          const response = await fetch('/api/account/profile', {
+            method: 'GET',
+            credentials: 'include',
+            cache: 'no-store',
+          });
+
+          if (!response.ok) {
+            setUser(null);
+            return false;
+          }
+
+          const profile = (await response.json()) as ServerProfilePayload;
+          if (profile.isActive === false || Boolean(profile.deletedAt)) {
+            setUser(null);
+            return false;
+          }
+          setUser({
+            id: profile.id,
+            email: profile.email ?? '',
+            full_name: profile.fullName ?? null,
+            avatar_url: profile.avatarUrl ?? null,
+            role: profile.role === 'admin' ? 'admin' : 'client',
+            phone: profile.phone ?? null,
+            country: profile.country ?? null,
+            bio: profile.bio ?? null,
+            is_active: profile.isActive,
+            two_fa_enabled: false,
+            created_at: profile.createdAt ?? new Date().toISOString(),
+          } as User);
+          return true;
+        } catch (profileError) {
+          if (!isAuthSessionMissingError(profileError)) {
+            console.error('Error fetching server profile fallback:', profileError);
+          }
+          setUser(null);
+          return false;
+        }
+      };
+
       const {
         data: { session },
+        error: sessionError,
       } = await supabase.auth.getSession();
 
-      if (session?.user) {
+      if (sessionError && !isAuthSessionMissingError(sessionError)) {
+        console.error('Error reading auth session:', sessionError);
+      }
+
+      if (!session) {
+        await fetchFromServerProfile();
+        return;
+      }
+
+      const {
+        data: { user: authUser },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError) {
+        if (!isAuthSessionMissingError(authError)) {
+          console.error('Error fetching authenticated user:', authError);
+        }
+        await fetchFromServerProfile();
+        return;
+      }
+
+      if (authUser) {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', session.user.id)
+          .eq('id', authUser.id)
           .maybeSingle();
 
         if (profile) {
@@ -308,7 +406,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           setUser({
             ...profile,
-            email: session.user.email!,
+            email: authUser.email!,
             phone: profileWithOptionalFields.phone_encrypted ?? null,
             country: profileWithOptionalFields.country ?? null,
             bio: profileWithOptionalFields.bio ?? null,
@@ -321,27 +419,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         setUser({
-          id: session.user.id,
-          email: session.user.email ?? '',
+          id: authUser.id,
+          email: authUser.email ?? '',
           full_name:
-            (session.user.user_metadata?.full_name as string | undefined) ?? null,
+            (authUser.user_metadata?.full_name as string | undefined) ?? null,
           avatar_url:
-            (session.user.user_metadata?.avatar_url as string | undefined) ?? null,
-          role: roleFromMetadata(session.user.app_metadata),
+            (authUser.user_metadata?.avatar_url as string | undefined) ?? null,
+          role: roleFromMetadata(authUser.app_metadata),
           phone: null,
           country: null,
           bio: null,
           is_active: true,
           two_fa_enabled: false,
-          created_at: session.user.created_at ?? new Date().toISOString(),
+          created_at: authUser.created_at ?? new Date().toISOString(),
         } as User);
         return;
       }
 
-      setUser(null);
+      await fetchFromServerProfile();
     } catch (error) {
-      console.error('Error fetching user:', error);
-      // Keep the previous in-memory user if this is a transient network issue.
+      if (!isAuthSessionMissingError(error)) {
+        console.error('Error fetching user:', error);
+      }
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -430,6 +530,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearFailedAttempts(normalizedEmail);
     clearVerificationExpiry(normalizedEmail);
     setPendingEmail(null);
+
+    const {
+      data: { user: authUser },
+      error: authUserError,
+    } = await supabase.auth.getUser();
+
+    if (!authUserError && authUser) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_active,deleted_at')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (!profileError && profile && (profile.is_active === false || Boolean(profile.deleted_at))) {
+        await supabase.auth.signOut();
+        return {
+          error: new Error('Compte bloque'),
+          code: 'ACCOUNT_BLOCKED',
+          message: 'Ce compte est desactive. Contactez un administrateur.',
+        };
+      }
+    }
+
     await fetchUser();
     return { error: null };
   };
@@ -551,10 +674,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    setUser(null);
-    setPendingEmail(null);
+    if (!supabase) {
+      setUser(null);
+      setPendingEmail(null);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error && !isAuthSessionMissingError(error)) {
+        console.error('Sign out error:', error);
+      }
+    } catch (error) {
+      if (!isAuthSessionMissingError(error)) {
+        console.error('Sign out exception:', error);
+      }
+    } finally {
+      setUser(null);
+      setPendingEmail(null);
+    }
   };
 
   const refreshUser = async () => {

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useCallback } from "react";
 import {
   Plus,
   Search,
@@ -18,11 +17,20 @@ import {
   Users,
   Globe,
   BarChart3,
+  Heart,
+  MessageCircle,
+  RefreshCw,
   AlertCircle,
   Loader,
-  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { VideoFormModal } from "@/components/admin/VideoFormModal";
 import { DeleteConfirmModal } from "@/components/admin/DeleteConfirmModal";
 import {
@@ -69,6 +77,95 @@ const videoTypeConfig = {
   vimeo: { label: "Vimeo", icon: Video },
 };
 
+type EngagementStatus = "all" | "approved" | "pending" | "rejected";
+
+type AdminVideoLike = {
+  id: string;
+  created_at: string;
+  liker_key: string;
+  user?: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+};
+
+type AdminVideoComment = {
+  id: string;
+  content: string;
+  status: "approved" | "pending" | "rejected";
+  likes: number;
+  created_at: string;
+  parent_id: string | null;
+  user?: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+};
+
+type AdminVideoEngagementPayload = {
+  data: {
+    video: {
+      id: string;
+      title: string;
+      slug: string;
+      status: string;
+      access_type: string;
+      view_count: number;
+      created_at: string;
+    };
+    stats: {
+      likes: number;
+      comments: {
+        total: number;
+        approved: number;
+        pending: number;
+        rejected: number;
+      };
+    };
+    likes: AdminVideoLike[];
+    likes_feature_available: boolean;
+    comments: AdminVideoComment[];
+    comments_feature_available: boolean;
+  };
+  meta: {
+    page: number;
+    limit: number;
+    status: EngagementStatus;
+    total: number;
+    totalPages: number;
+  };
+};
+
+const commentStatusConfig: Record<
+  "approved" | "pending" | "rejected",
+  { label: string; className: string }
+> = {
+  approved: {
+    label: "Approuve",
+    className: "bg-green-500/10 text-green-500 border-green-500/20",
+  },
+  pending: {
+    label: "En attente",
+    className: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  },
+  rejected: {
+    label: "Rejete",
+    className: "bg-red-500/10 text-red-500 border-red-500/20",
+  },
+};
+
+const engagementStatusOptions: Array<{
+  value: EngagementStatus;
+  label: string;
+}> = [
+  { value: "all", label: "Tous" },
+  { value: "approved", label: "Approuves" },
+  { value: "pending", label: "En attente" },
+  { value: "rejected", label: "Rejetes" },
+];
+
 export default function VideosPage() {
   const {
     videos,
@@ -88,6 +185,16 @@ export default function VideosPage() {
   const [videoToDelete, setVideoToDelete] = useState<VideoType | undefined>();
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [showStatusMenu, setShowStatusMenu] = useState<string | null>(null);
+  const [engagementOpen, setEngagementOpen] = useState(false);
+  const [engagementVideoId, setEngagementVideoId] = useState<string | null>(null);
+  const [engagementStatusFilter, setEngagementStatusFilter] =
+    useState<EngagementStatus>("all");
+  const [engagementPage, setEngagementPage] = useState(1);
+  const [engagementLoading, setEngagementLoading] = useState(false);
+  const [engagementRefreshing, setEngagementRefreshing] = useState(false);
+  const [engagementError, setEngagementError] = useState<string | null>(null);
+  const [engagementData, setEngagementData] =
+    useState<AdminVideoEngagementPayload | null>(null);
 
   // CORRECTION : State pour gérer quelle vidéo est en lecture (par ID)
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
@@ -95,7 +202,7 @@ export default function VideosPage() {
   // Fetch videos on mount
   useEffect(() => {
     fetchVideos();
-  }, []);
+  }, [fetchVideos]);
 
   const filteredVideos = videos.filter((v) => {
     if (accessFilter && v.access_type !== accessFilter) return false;
@@ -163,6 +270,82 @@ export default function VideosPage() {
   const stopVideo = () => {
     setPlayingVideoId(null);
   };
+
+  const openEngagement = (video: VideoType) => {
+    setEngagementVideoId(video.id);
+    setEngagementStatusFilter("all");
+    setEngagementPage(1);
+    setEngagementOpen(true);
+    setEngagementData(null);
+    setEngagementError(null);
+  };
+
+  const handleEngagementOpenChange = (open: boolean) => {
+    setEngagementOpen(open);
+    if (!open) {
+      setEngagementVideoId(null);
+      setEngagementData(null);
+      setEngagementError(null);
+      setEngagementPage(1);
+      setEngagementStatusFilter("all");
+      setEngagementLoading(false);
+      setEngagementRefreshing(false);
+    }
+  };
+
+  const fetchEngagement = useCallback(
+    async (silent = false) => {
+      if (!engagementOpen || !engagementVideoId) return;
+
+      try {
+        if (silent) {
+          setEngagementRefreshing(true);
+        } else {
+          setEngagementLoading(true);
+        }
+        setEngagementError(null);
+
+        const query = new URLSearchParams({
+          page: String(engagementPage),
+          limit: "10",
+          status: engagementStatusFilter,
+        });
+
+        const response = await fetch(
+          `/api/admin/videos/${encodeURIComponent(
+            engagementVideoId,
+          )}/engagement?${query.toString()}`,
+          { cache: "no-store" },
+        );
+
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error || "Impossible de charger l'engagement.");
+        }
+
+        setEngagementData(payload as AdminVideoEngagementPayload);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Impossible de charger l'engagement.";
+        setEngagementError(message);
+      } finally {
+        if (silent) {
+          setEngagementRefreshing(false);
+        } else {
+          setEngagementLoading(false);
+        }
+      }
+    },
+    [engagementOpen, engagementVideoId, engagementPage, engagementStatusFilter],
+  );
+
+  useEffect(() => {
+    if (!engagementOpen || !engagementVideoId) return;
+    void fetchEngagement(false);
+  }, [engagementOpen, engagementVideoId, engagementPage, engagementStatusFilter, fetchEngagement]);
+
+  const engagementSelectedVideo =
+    videos.find((video) => video.id === engagementVideoId) || null;
 
   return (
     <div
@@ -330,7 +513,7 @@ export default function VideosPage() {
             </p>
             <p className="text-sm text-[var(--muted)] mb-6">
               Commencez par créer votre première vidéo pour que votre
-              vidéothèque s'enrichisse.
+              vidéothèque se developpe.
             </p>
             <Button onClick={handleAddVideo} className="gap-2" size="sm">
               <Plus className="w-4 h-4" />
@@ -634,6 +817,18 @@ export default function VideosPage() {
                           <span className="text-xs">vues</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-[var(--muted)]">
+                          <Heart className="w-4 h-4" />
+                          <span className="font-medium">
+                            {Number(video.like_count || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[var(--muted)]">
+                          <MessageCircle className="w-4 h-4" />
+                          <span className="font-medium">
+                            {Number(video.comment_count || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[var(--muted)]">
                           <Calendar className="w-4 h-4" />
                           <span className="text-xs">
                             {formatDate(video.created_at)}
@@ -654,6 +849,20 @@ export default function VideosPage() {
                         </div>
                       )}
                     </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEngagement(video);
+                      }}
+                      className="w-full gap-2 border-[var(--border)] bg-[var(--input)]/40 text-[var(--foreground)] hover:bg-[var(--primary)]/10 hover:text-[var(--primary)]"
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      Analyser likes et commentaires
+                    </Button>
                   </div>
                 </div>
               );
@@ -661,6 +870,321 @@ export default function VideosPage() {
           </div>
         </>
       )}
+
+      <Dialog open={engagementOpen} onOpenChange={handleEngagementOpenChange}>
+        <DialogContent className="w-[96vw] max-w-5xl p-0 border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-[var(--border)]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <DialogTitle className="text-xl text-[var(--foreground)]">
+                  Analyse engagement video
+                </DialogTitle>
+                <DialogDescription className="text-[var(--muted)]">
+                  {engagementData?.data.video.title ||
+                    engagementSelectedVideo?.title ||
+                    "Chargement de la video..."}
+                </DialogDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void fetchEngagement(true)}
+                disabled={engagementLoading || engagementRefreshing}
+                className="gap-2 border-[var(--border)]"
+              >
+                <RefreshCw
+                  className={cn(
+                    "w-4 h-4",
+                    engagementRefreshing && "animate-spin",
+                  )}
+                />
+                Actualiser
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <div className="max-h-[72vh] overflow-y-auto px-6 py-5 space-y-4">
+            {engagementLoading ? (
+              <div className="py-12 flex items-center justify-center">
+                <div className="flex items-center gap-3 text-[var(--muted)]">
+                  <Loader className="w-5 h-5 animate-spin" />
+                  Chargement de l engagement...
+                </div>
+              </div>
+            ) : engagementError ? (
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+                <p className="font-medium text-red-500">
+                  Impossible de charger les statistiques.
+                </p>
+                <p className="text-sm text-red-400 mt-1">{engagementError}</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void fetchEngagement(false)}
+                  className="mt-3 border-red-500/40 text-red-500 hover:bg-red-500/10"
+                >
+                  Reessayer
+                </Button>
+              </div>
+            ) : !engagementData ? (
+              <div className="py-12 text-center text-[var(--muted)]">
+                Aucune donnee engagement.
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  <div className="rounded-xl border border-[var(--border)] bg-[var(--input)]/30 p-3">
+                    <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
+                      J aime
+                    </p>
+                    <p className="text-2xl font-semibold mt-1">
+                      {engagementData.data.stats.likes.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border)] bg-[var(--input)]/30 p-3">
+                    <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
+                      Commentaires
+                    </p>
+                    <p className="text-2xl font-semibold mt-1">
+                      {engagementData.data.stats.comments.total.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3">
+                    <p className="text-xs uppercase tracking-wide text-green-600 dark:text-green-400">
+                      Approuves
+                    </p>
+                    <p className="text-2xl font-semibold mt-1 text-green-600 dark:text-green-400">
+                      {engagementData.data.stats.comments.approved.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                    <p className="text-xs uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                      En attente
+                    </p>
+                    <p className="text-2xl font-semibold mt-1 text-amber-600 dark:text-amber-400">
+                      {engagementData.data.stats.comments.pending.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+                    <p className="text-xs uppercase tracking-wide text-red-600 dark:text-red-400">
+                      Rejetes
+                    </p>
+                    <p className="text-2xl font-semibold mt-1 text-red-600 dark:text-red-400">
+                      {engagementData.data.stats.comments.rejected.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  <section className="rounded-xl border border-[var(--border)] bg-[var(--input)]/20 p-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-[var(--foreground)]">
+                        Personnes qui ont aime
+                      </h3>
+                      <span className="text-xs text-[var(--muted)]">
+                        {engagementData.data.likes.length} recents
+                      </span>
+                    </div>
+
+                    {!engagementData.data.likes_feature_available ? (
+                      <p className="text-sm text-[var(--muted)] mt-3">
+                        La table des likes videos n est pas disponible.
+                      </p>
+                    ) : engagementData.data.likes.length === 0 ? (
+                      <p className="text-sm text-[var(--muted)] mt-3">
+                        Aucun like pour cette video.
+                      </p>
+                    ) : (
+                      <div className="mt-3 space-y-2">
+                        {engagementData.data.likes.map((like) => {
+                          const fullName = like.user?.full_name?.trim();
+                          const label =
+                            fullName && fullName.length > 0
+                              ? fullName
+                              : `Visiteur ${like.liker_key.slice(0, 8)}`;
+                          const initials = label.slice(0, 2).toUpperCase();
+
+                          return (
+                            <div
+                              key={like.id}
+                              className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="h-8 w-8 rounded-full bg-[var(--primary)]/15 text-[var(--primary)] flex items-center justify-center text-xs font-semibold shrink-0">
+                                  {initials}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium truncate">
+                                    {label}
+                                  </p>
+                                  <p className="text-xs text-[var(--muted)] truncate">
+                                    {like.user?.id
+                                      ? `Utilisateur: ${like.user.id}`
+                                      : `Cle: ${like.liker_key.slice(0, 14)}`}
+                                  </p>
+                                </div>
+                              </div>
+                              <p className="text-xs text-[var(--muted)] shrink-0">
+                                {formatDate(like.created_at)}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="rounded-xl border border-[var(--border)] bg-[var(--input)]/20 p-4">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="font-semibold text-[var(--foreground)]">
+                          Commentaires
+                        </h3>
+                        <span className="text-xs text-[var(--muted)]">
+                          {engagementData.meta.total.toLocaleString()} resultat
+                          {engagementData.meta.total > 1 ? "s" : ""}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {engagementStatusOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => {
+                              setEngagementStatusFilter(option.value);
+                              setEngagementPage(1);
+                            }}
+                            className={cn(
+                              "rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                              engagementStatusFilter === option.value
+                                ? "border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]"
+                                : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--card)]",
+                            )}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {!engagementData.data.comments_feature_available ? (
+                      <p className="text-sm text-[var(--muted)] mt-3">
+                        Les commentaires video ne sont pas disponibles dans votre
+                        base SQL.
+                      </p>
+                    ) : engagementData.data.comments.length === 0 ? (
+                      <p className="text-sm text-[var(--muted)] mt-3">
+                        Aucun commentaire pour ce filtre.
+                      </p>
+                    ) : (
+                      <div className="mt-3 space-y-3">
+                        {engagementData.data.comments.map((comment) => {
+                          const fullName = comment.user?.full_name?.trim();
+                          const author =
+                            fullName && fullName.length > 0
+                              ? fullName
+                              : "Utilisateur inconnu";
+                          const initials = author.slice(0, 2).toUpperCase();
+                          const statusKey =
+                            comment.status in commentStatusConfig
+                              ? comment.status
+                              : "pending";
+
+                          return (
+                            <article
+                              key={comment.id}
+                              className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-3"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="h-8 w-8 rounded-full bg-[var(--primary)]/15 text-[var(--primary)] flex items-center justify-center text-xs font-semibold shrink-0">
+                                    {initials}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium truncate">
+                                      {author}
+                                    </p>
+                                    <p className="text-xs text-[var(--muted)]">
+                                      {formatDate(comment.created_at)}
+                                    </p>
+                                  </div>
+                                </div>
+                                <span
+                                  className={cn(
+                                    "px-2 py-1 rounded-md border text-[11px] font-semibold",
+                                    commentStatusConfig[statusKey].className,
+                                  )}
+                                >
+                                  {commentStatusConfig[statusKey].label}
+                                </span>
+                              </div>
+
+                              <p className="mt-2 text-sm text-[var(--foreground)] whitespace-pre-line break-words">
+                                {comment.content}
+                              </p>
+
+                              <div className="mt-2 flex items-center gap-3 text-xs text-[var(--muted)]">
+                                <span className="inline-flex items-center gap-1">
+                                  <Heart className="w-3.5 h-3.5" />
+                                  {Number(comment.likes || 0).toLocaleString()}
+                                </span>
+                                {comment.parent_id && (
+                                  <span className="inline-flex items-center gap-1 rounded bg-[var(--input)] px-2 py-0.5">
+                                    Reponse
+                                  </span>
+                                )}
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {engagementData.meta.totalPages > 1 && (
+                      <div className="mt-4 flex items-center justify-between">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={engagementPage <= 1}
+                          onClick={() =>
+                            setEngagementPage((current) => Math.max(1, current - 1))
+                          }
+                          className="border-[var(--border)]"
+                        >
+                          Precedent
+                        </Button>
+                        <p className="text-xs text-[var(--muted)]">
+                          Page {engagementData.meta.page} /{" "}
+                          {engagementData.meta.totalPages}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={engagementPage >= engagementData.meta.totalPages}
+                          onClick={() =>
+                            setEngagementPage((current) =>
+                              Math.min(engagementData.meta.totalPages, current + 1),
+                            )
+                          }
+                          className="border-[var(--border)]"
+                        >
+                          Suivant
+                        </Button>
+                      </div>
+                    )}
+                  </section>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Modals */}
       <VideoFormModal
         isOpen={isFormOpen}

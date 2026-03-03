@@ -3,21 +3,37 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Search,
   Trash2,
   CheckCircle,
   XCircle,
   MessageSquare,
+  Reply,
   Loader2,
   ChevronLeft,
   ChevronRight,
   User
 } from 'lucide-react';
+import Image from 'next/image';
 import { useCommentaires, useDeleteCommentaire, useBulkDeleteCommentaires, useUpdateCommentaire } from '@/hooks/useAdmin';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
+
+type AdminComment = {
+  id: string;
+  content: string;
+  status: 'approved' | 'pending' | 'rejected';
+  parent_id: string | null;
+  created_at: string;
+  article?: { title: string | null } | null;
+  user?: { full_name: string | null; avatar_url: string | null } | null;
+  parent?: {
+    id: string;
+    content: string;
+    user?: { full_name: string | null; avatar_url: string | null } | null;
+  } | null;
+};
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -45,12 +61,12 @@ export default function CommentairesPage() {
   const bulkDeleteMutation = useBulkDeleteCommentaires();
   const updateMutation = useUpdateCommentaire();
 
-  const commentaires = data?.data || [];
+  const commentaires: AdminComment[] = (data?.data || []) as AdminComment[];
   const meta = data?.meta || { total: 0, totalPages: 1 };
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(commentaires.map((c: any) => c.id));
+      setSelectedIds(commentaires.map((c) => c.id));
     } else {
       setSelectedIds([]);
     }
@@ -188,7 +204,7 @@ export default function CommentairesPage() {
                   </td>
                 </tr>
               ) : (
-                commentaires.map((commentaire: any) => (
+                commentaires.map((commentaire) => (
                   <tr key={commentaire.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]/50 transition-colors">
                     <td className="py-4 px-4 text-center">
                       <Checkbox 
@@ -200,14 +216,25 @@ export default function CommentairesPage() {
                       <div className="flex items-start gap-3">
                         <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 relative">
                           {commentaire.user?.avatar_url ? (
-                             <img src={commentaire.user?.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                             <Image src={commentaire.user?.avatar_url} alt="avatar" fill className="w-full h-full object-cover" />
                           ) : (
                              <User className="w-5 h-5 text-[var(--primary)]" />
                           )}
                         </div>
                         <div>
                           <h4 className="font-medium text-[var(--foreground)] text-sm">{commentaire.user?.full_name || 'Utilisateur anonyme'}</h4>
-                          <p className="text-sm text-[var(--muted)] line-clamp-2 mt-1 whitespace-pre-line">{commentaire.content}</p>
+                          <p className="text-sm text-[var(--muted)] mt-1 whitespace-pre-line">{commentaire.content}</p>
+                          {commentaire.parent_id && (
+                            <div className="mt-2 inline-flex items-center gap-1 rounded-md bg-[var(--accent)] px-2 py-1 text-xs text-[var(--muted)]">
+                              <Reply className="w-3 h-3" />
+                              Reponse a {commentaire.parent?.user?.full_name || 'un commentaire'}
+                            </div>
+                          )}
+                          {commentaire.parent?.content && (
+                            <p className="text-xs text-[var(--muted)] mt-1 whitespace-pre-line">
+                              &quot;{commentaire.parent.content}&quot;
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { normalizeProductRecord, normalizeProductType, normalizeStringArray } from '@/lib/products';
 
 // GET /api/admin/produits - List all produits
 export async function GET(request: NextRequest) {
@@ -25,8 +26,8 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json(data);
-  } catch (error: any) {
+    return NextResponse.json((data ?? []).map((row) => normalizeProductRecord(row as Record<string, unknown>)));
+  } catch (error) {
     console.error('Produits fetch error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch produits' },
@@ -48,8 +49,8 @@ export async function POST(request: NextRequest) {
         description: body.description,
         content: body.content,
         price: body.price,
-        images: body.images,
-        type: body.type,
+        images: normalizeStringArray(body.images),
+        type: normalizeProductType(body.type),
         stock: body.stock,
         is_digital: body.is_digital,
         file_url: body.file_url,
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
         adr_class: body.adr_class,
         category_id: body.category_id || null,
         featured: body.featured,
-        status: body.status || 'draft',
+        status: body.status || 'published',
       })
       .select('*, category:categories(name)')
       .single();
@@ -82,8 +83,8 @@ export async function POST(request: NextRequest) {
       new_data: data,
     });
 
-    return NextResponse.json(data, { status: 201 });
-  } catch (error: any) {
+    return NextResponse.json(normalizeProductRecord(data as Record<string, unknown>), { status: 201 });
+  } catch (error) {
     console.error('Produit create error:', error);
     return NextResponse.json(
       { error: 'Failed to create produit' },

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -19,7 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -37,6 +38,56 @@ function formatDuration(ms: number) {
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function normalizeNextPath(value: string | null) {
+  if (!value) return null;
+  if (!value.startsWith("/") || value.startsWith("//")) return null;
+  return value;
+}
+
+async function resolvePostLoginPath(nextPath: string | null) {
+  const safeNextPath = normalizeNextPath(nextPath);
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { target: "/", blocked: false };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role,is_active,deleted_at")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const isBlocked = profile
+    ? profile.is_active === false || Boolean(profile.deleted_at)
+    : false;
+  if (isBlocked) {
+    await supabase.auth.signOut();
+    return { target: "/auth/connexion?blocked=1", blocked: true };
+  }
+
+  const metadataRole =
+    (user.app_metadata?.role as "admin" | "client" | undefined) ??
+    (user.user_metadata?.role as "admin" | "client" | undefined);
+  const role = profile?.role === "admin" || metadataRole === "admin" ? "admin" : "client";
+
+  if (role === "admin") {
+    if (safeNextPath?.startsWith("/admin")) {
+      return { target: safeNextPath, blocked: false };
+    }
+    return { target: "/admin/dashboard", blocked: false };
+  }
+
+  if (safeNextPath && !safeNextPath.startsWith("/admin")) {
+    return { target: safeNextPath, blocked: false };
+  }
+
+  return { target: "/", blocked: false };
 }
 
 export default function LoginPage() {
@@ -62,6 +113,9 @@ export default function LoginPage() {
     initError,
   } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next");
+  const blockedParam = searchParams.get("blocked");
 
   const normalizedEmail = useMemo(() => normalizeEmail(email), [email]);
   const lockoutRemainingMs = normalizedEmail ? getLoginLockRemainingMs(normalizedEmail) : 0;
@@ -79,9 +133,18 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace("/");
+      void (async () => {
+        const { target } = await resolvePostLoginPath(nextPath);
+        router.replace(target);
+      })();
     }
-  }, [loading, user, router]);
+  }, [loading, user, router, nextPath]);
+
+  useEffect(() => {
+    if (blockedParam === "1") {
+      setAuthErrorMessage("Ce compte est desactive. Contactez un administrateur.");
+    }
+  }, [blockedParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +190,11 @@ export default function LoginPage() {
             `Email ou mot de passe invalide. Tentatives restantes: ${remainingAttempts}.`,
           );
           toast.error("Identifiants invalides.");
+        } else if (result.code === "ACCOUNT_BLOCKED") {
+          setAuthErrorMessage(
+            result.message || "Ce compte est desactive. Contactez un administrateur.",
+          );
+          toast.error("Compte desactive.");
         } else {
           setAuthErrorMessage(result.message || "Connexion indisponible pour le moment.");
           toast.error(result.message || "Erreur de connexion.");
@@ -135,8 +203,17 @@ export default function LoginPage() {
         setAuthErrorMessage(null);
         setVerificationEmail(null);
         setVerificationExpiresAtMs(null);
+
+        const { target, blocked } = await resolvePostLoginPath(nextPath);
+        if (blocked) {
+          setAuthErrorMessage("Ce compte est desactive. Contactez un administrateur.");
+          toast.error("Compte desactive.");
+          router.replace(target);
+          return;
+        }
+
         toast.success("Connexion reussie.");
-        router.push("/");
+        router.replace(target);
         router.refresh();
       }
     } catch {

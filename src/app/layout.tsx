@@ -33,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
+    <html lang="fr" className="dark" style={{ colorScheme: "dark" }}>
       <body
         className={`${playfair.variable} ${jakarta.variable} font-sans antialiased`}
       >

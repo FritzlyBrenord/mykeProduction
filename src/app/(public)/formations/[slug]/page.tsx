@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import ShareButton from "@/components/share/ShareButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCart } from "@/lib/hooks/useCart";
 import { Formation } from "@/lib/types";
@@ -139,11 +140,15 @@ export default function FormationDetailPage() {
 
     setIsAddingToCart(true);
     try {
+      const thumbnailSrc =
+        formation.thumbnail_url || "/images/placeholder-formation.svg";
       await addItem({
         item_type: "formation",
         item_id: formation.id,
         unit_price: Number(formation.price) || 0,
         quantity: 1,
+        item_name: formation.title,
+        item_image: thumbnailSrc,
       });
       toast.success("Formation ajoutee au panier.");
       router.push("/boutique/panier");
@@ -271,7 +276,7 @@ export default function FormationDetailPage() {
                     <Image
                       src={
                         formation.thumbnail_url ||
-                        "/images/placeholder-formation.jpg"
+                        "/images/placeholder-formation.svg"
                       }
                       alt={formation.title}
                       fill
@@ -317,6 +322,18 @@ export default function FormationDetailPage() {
                             : "Ajouter au panier"}
                         </Button>
                       )}
+
+                      <ShareButton
+                        title={formation.title}
+                        text={
+                          formation.description || "Decouvrez cette formation"
+                        }
+                        path={`/formations/${formation.slug}`}
+                        variant="outline"
+                        size="lg"
+                        buttonClassName="w-full h-11"
+                        className="text-black"
+                      />
                     </div>
 
                     <div className="mt-6 space-y-3 text-sm text-slate-600">
@@ -480,7 +497,7 @@ export default function FormationDetailPage() {
                     <Image
                       src={
                         relatedFormation.thumbnail_url ||
-                        "/images/placeholder-formation.jpg"
+                        "/images/placeholder-formation.svg"
                       }
                       alt={relatedFormation.title}
                       fill

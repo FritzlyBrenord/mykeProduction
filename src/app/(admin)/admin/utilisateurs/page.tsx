@@ -1,24 +1,96 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import {
+  AlertCircle,
+  CalendarDays,
+  Clock3,
+  Lock,
+  RefreshCw,
   Search,
-  User,
   Shield,
-  ShieldCheck,
-  Ban,
-  CheckCircle,
-  LogOut,
-  Eye,
-  MoreHorizontal,
-  Users,
+  Trash2,
+  Unlock,
+  User,
   UserCheck,
+  UserCog,
+  UserPlus,
   UserX,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { formatDate } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+  Users,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn, formatDate } from "@/lib/utils";
+
+type VisitorPeriod = "day" | "week" | "month" | "year";
+
+type AdminUser = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  role: "admin" | "client";
+  is_active: boolean;
+  two_fa_enabled: boolean;
+  last_login_at: string | null;
+  created_at: string;
+};
+
+type AdminVisitor = {
+  id: string;
+  first_seen: string;
+  last_seen: string;
+  sources: Array<"article" | "video" | "cart" | "site">;
+  user_agent: string | null;
+  ip_hash: string | null;
+  country_code?: string | null;
+  events: number;
+};
+
+type DailyVisitorStat = {
+  date: string;
+  visitors: number;
+};
+
+type ApiPayload = {
+  data: {
+    users: AdminUser[];
+    visitors: AdminVisitor[];
+    visitor_daily: DailyVisitorStat[];
+    stats: {
+      users_total: number;
+      admins_total: number;
+      clients_total: number;
+      active_total: number;
+      inactive_total: number;
+      registrations_today: number;
+      visitors_today: number;
+      visitors_week: number;
+      visitors_month: number;
+      visitors_year: number;
+    };
+    acting_admin?: {
+      id: string;
+      email: string | null;
+      full_name: string | null;
+    };
+  };
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    period: VisitorPeriod;
+  };
+};
+
+type CreateUserFormState = {
+  email: string;
+  password: string;
+  full_name: string;
+  role: "admin" | "client";
+};
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -30,84 +102,320 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 };
 
-// Mock data
-const mockUsers = [
-  {
-    id: '1',
-    full_name: 'Jean Dupont',
-    email: 'jean.dupont@example.com',
-    role: 'admin',
-    is_active: true,
-    two_fa_enabled: true,
-    last_login_at: '2026-02-24T10:30:00Z',
-    created_at: '2025-12-01T00:00:00Z',
-    avatar_url: null,
-  },
-  {
-    id: '2',
-    full_name: 'Marie Martin',
-    email: 'marie.martin@example.com',
-    role: 'client',
-    is_active: true,
-    two_fa_enabled: false,
-    last_login_at: '2026-02-24T08:15:00Z',
-    created_at: '2026-01-15T00:00:00Z',
-    avatar_url: null,
-  },
-  {
-    id: '3',
-    full_name: 'Pierre Bernard',
-    email: 'pierre.bernard@example.com',
-    role: 'client',
-    is_active: false,
-    two_fa_enabled: false,
-    last_login_at: '2026-02-20T14:20:00Z',
-    created_at: '2026-01-20T00:00:00Z',
-    avatar_url: null,
-  },
-  {
-    id: '4',
-    full_name: 'Sophie Petit',
-    email: 'sophie.petit@example.com',
-    role: 'client',
-    is_active: true,
-    two_fa_enabled: true,
-    last_login_at: '2026-02-23T16:45:00Z',
-    created_at: '2026-02-01T00:00:00Z',
-    avatar_url: null,
-  },
-  {
-    id: '5',
-    full_name: 'Lucas Moreau',
-    email: 'lucas.moreau@example.com',
-    role: 'client',
-    is_active: true,
-    two_fa_enabled: false,
-    last_login_at: '2026-02-22T11:20:00Z',
-    created_at: '2026-02-05T00:00:00Z',
-    avatar_url: null,
-  },
+const periodOptions: Array<{ value: VisitorPeriod; label: string }> = [
+  { value: "day", label: "Jour" },
+  { value: "week", label: "Semaine" },
+  { value: "month", label: "Mois" },
+  { value: "year", label: "Annee" },
 ];
 
+function shortVisitorId(value: string) {
+  if (value.length <= 18) return value;
+  return `${value.slice(0, 8)}...${value.slice(-6)}`;
+}
+
 export default function UtilisateursPage() {
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('');
-  const [selectedUser, setSelectedUser] = useState<typeof mockUsers[0] | null>(null);
-  
-  const filteredUsers = mockUsers.filter((user) => {
-    if (roleFilter && user.role !== roleFilter) return false;
-    if (search && !user.full_name?.toLowerCase().includes(search.toLowerCase()) && 
-        !user.email.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "client">("all");
+  const [periodFilter, setPeriodFilter] = useState<VisitorPeriod>("day");
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [visitors, setVisitors] = useState<AdminVisitor[]>([]);
+  const [visitorDaily, setVisitorDaily] = useState<DailyVisitorStat[]>([]);
+  const [actingAdmin, setActingAdmin] = useState<{
+    id: string;
+    email: string | null;
+    full_name: string | null;
+  } | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [mutationUserId, setMutationUserId] = useState<string | null>(null);
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState<CreateUserFormState>({
+    email: "",
+    password: "",
+    full_name: "",
+    role: "client",
+  });
+  const [meta, setMeta] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 1,
+    period: "day" as VisitorPeriod,
+  });
+  const [stats, setStats] = useState({
+    users_total: 0,
+    admins_total: 0,
+    clients_total: 0,
+    active_total: 0,
+    inactive_total: 0,
+    registrations_today: 0,
+    visitors_today: 0,
+    visitors_week: 0,
+    visitors_month: 0,
+    visitors_year: 0,
   });
 
-  const stats = {
-    total: mockUsers.length,
-    admins: mockUsers.filter((u) => u.role === 'admin').length,
-    clients: mockUsers.filter((u) => u.role === 'client').length,
-    active: mockUsers.filter((u) => u.is_active).length,
-    inactive: mockUsers.filter((u) => !u.is_active).length,
-    with2FA: mockUsers.filter((u) => u.two_fa_enabled).length,
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  const fetchData = useCallback(
+    async (silent = false) => {
+      try {
+        if (silent) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+        setError(null);
+
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: "20",
+          role: roleFilter,
+          period: periodFilter,
+        });
+
+        if (search) {
+          params.set("search", search);
+        }
+
+        const response = await fetch(`/api/admin/utilisateurs?${params.toString()}`, {
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as ApiPayload | { error?: string };
+
+        if (!response.ok) {
+          throw new Error(payload && "error" in payload ? payload.error : "Erreur de chargement");
+        }
+
+        const data = (payload as ApiPayload).data;
+        const nextMeta = (payload as ApiPayload).meta;
+        setUsers(data.users || []);
+        setVisitors(data.visitors || []);
+        setVisitorDaily(data.visitor_daily || []);
+        setStats(data.stats);
+        setActingAdmin(data.acting_admin ?? null);
+        setMeta(nextMeta);
+        setSelectedUserIds((current) =>
+          current.filter((id) => (data.users || []).some((user) => user.id === id)),
+        );
+      } catch (fetchError) {
+        const message =
+          fetchError instanceof Error ? fetchError.message : "Impossible de charger les utilisateurs.";
+        setError(message);
+      } finally {
+        if (silent) {
+          setRefreshing(false);
+        } else {
+          setLoading(false);
+        }
+      }
+    },
+    [page, periodFilter, roleFilter, search],
+  );
+
+  useEffect(() => {
+    void fetchData(false);
+  }, [fetchData]);
+
+  const deletableUserIds = useMemo(
+    () =>
+      users
+        .filter((user) => user.role !== "admin" && user.id !== actingAdmin?.id)
+        .map((user) => user.id),
+    [users, actingAdmin?.id],
+  );
+
+  const isAllCurrentUsersSelected =
+    deletableUserIds.length > 0 &&
+    deletableUserIds.every((id) => selectedUserIds.includes(id));
+
+  const selectedUsersCount = selectedUserIds.length;
+
+  const visitorsPeriodLabel = useMemo(
+    () => periodOptions.find((option) => option.value === meta.period)?.label || "Jour",
+    [meta.period],
+  );
+
+  const toggleUser = (id: string) => {
+    setSelectedUserIds((current) =>
+      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
+    );
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedUserIds(deletableUserIds);
+    } else {
+      setSelectedUserIds([]);
+    }
+  };
+
+  const handleDeleteUser = async (user: AdminUser) => {
+    const label = user.full_name || shortVisitorId(user.id);
+    const confirmed = window.confirm(`Supprimer le compte "${label}" ?`);
+    if (!confirmed) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/admin/utilisateurs/${encodeURIComponent(user.id)}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || "Suppression impossible.");
+      }
+
+      await fetchData(true);
+    } catch (deleteError) {
+      const message =
+        deleteError instanceof Error ? deleteError.message : "Erreur pendant la suppression.";
+      setError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedUserIds.length === 0) return;
+    const confirmed = window.confirm(
+      `Supprimer ${selectedUserIds.length} utilisateur(s) selectionne(s) ?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch("/api/admin/utilisateurs", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedUserIds }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || "Suppression multiple impossible.");
+      }
+
+      setSelectedUserIds([]);
+      await fetchData(true);
+    } catch (deleteError) {
+      const message =
+        deleteError instanceof Error ? deleteError.message : "Erreur pendant la suppression multiple.";
+      setError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const updateUser = async (
+    userId: string,
+    payload: Partial<{
+      role: "admin" | "client";
+      is_active: boolean;
+      full_name: string | null;
+    }>,
+  ) => {
+    setMutationUserId(userId);
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/utilisateurs/${encodeURIComponent(userId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(body.error || "Mise a jour impossible.");
+      }
+      await fetchData(true);
+    } finally {
+      setMutationUserId(null);
+      setSubmitting(false);
+    }
+  };
+
+  const handleRoleChange = async (user: AdminUser, role: "admin" | "client") => {
+    if (role === user.role) return;
+    try {
+      await updateUser(user.id, { role });
+    } catch (updateError) {
+      const message =
+        updateError instanceof Error ? updateError.message : "Erreur lors du changement de role.";
+      setError(message);
+    }
+  };
+
+  const handleToggleUserActive = async (user: AdminUser) => {
+    const nextActive = !user.is_active;
+    const confirmed = window.confirm(
+      nextActive
+        ? `Debloquer le compte "${user.full_name || user.id}" ?`
+        : `Bloquer le compte "${user.full_name || user.id}" ?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      await updateUser(user.id, { is_active: nextActive });
+    } catch (updateError) {
+      const message =
+        updateError instanceof Error ? updateError.message : "Erreur lors du blocage/deblocage.";
+      setError(message);
+    }
+  };
+
+  const handleCreateUser = async () => {
+    if (!createUserForm.email.trim() || !createUserForm.password.trim()) {
+      setError("Email et mot de passe obligatoires.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError(null);
+      const response = await fetch("/api/admin/utilisateurs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: createUserForm.email.trim().toLowerCase(),
+          password: createUserForm.password,
+          full_name: createUserForm.full_name.trim(),
+          role: createUserForm.role,
+          is_active: true,
+        }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || "Creation impossible.");
+      }
+
+      setCreateUserForm({
+        email: "",
+        password: "",
+        full_name: "",
+        role: "client",
+      });
+      setCreateUserOpen(false);
+      await fetchData(true);
+    } catch (createError) {
+      const message =
+        createError instanceof Error ? createError.message : "Erreur lors de la creation du compte.";
+      setError(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -117,245 +425,492 @@ export default function UtilisateursPage() {
       animate="visible"
       className="space-y-6"
     >
-      {/* Header */}
-      <motion.div variants={itemVariants}>
-        <h1 className="text-3xl font-bold text-[var(--foreground)]">Utilisateurs</h1>
-        <p className="text-[var(--muted)] mt-1">Gérez les utilisateurs et leurs permissions</p>
+      <motion.div variants={itemVariants} className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-[var(--foreground)]">Utilisateurs et visiteurs</h1>
+          <p className="text-[var(--muted)] mt-1">
+            Suivi complet des comptes et des visiteurs non connectes.
+          </p>
+          {actingAdmin && (
+            <p className="text-xs text-[var(--muted)] mt-2">
+              Connecte en tant que admin: {actingAdmin.full_name || actingAdmin.email || actingAdmin.id}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            className="gap-2"
+            onClick={() => setCreateUserOpen((current) => !current)}
+            disabled={submitting}
+          >
+            <UserPlus className="h-4 w-4" />
+            Creer utilisateur
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={() => void fetchData(true)}
+            disabled={loading || refreshing || submitting}
+          >
+            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+            Actualiser
+          </Button>
+        </div>
       </motion.div>
 
-      {/* Stats */}
-      <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      {createUserOpen && (
+        <motion.div
+          variants={itemVariants}
+          className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-5"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <UserCog className="w-4 h-4 text-[var(--primary)]" />
+            <h2 className="font-semibold text-[var(--foreground)]">Nouveau compte utilisateur</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <input
+              type="email"
+              value={createUserForm.email}
+              onChange={(event) =>
+                setCreateUserForm((current) => ({ ...current, email: event.target.value }))
+              }
+              placeholder="email@entreprise.com"
+              className="px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            />
+            <input
+              type="password"
+              value={createUserForm.password}
+              onChange={(event) =>
+                setCreateUserForm((current) => ({ ...current, password: event.target.value }))
+              }
+              placeholder="Mot de passe (min 8)"
+              className="px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            />
+            <input
+              type="text"
+              value={createUserForm.full_name}
+              onChange={(event) =>
+                setCreateUserForm((current) => ({ ...current, full_name: event.target.value }))
+              }
+              placeholder="Nom complet"
+              className="px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            />
+            <select
+              value={createUserForm.role}
+              onChange={(event) =>
+                setCreateUserForm((current) => ({
+                  ...current,
+                  role: event.target.value as "admin" | "client",
+                }))
+              }
+              className="px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            >
+              <option value="client">Client</option>
+              <option value="admin">Administrateur</option>
+            </select>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCreateUserOpen(false)}
+              disabled={submitting}
+            >
+              Annuler
+            </Button>
+            <Button type="button" onClick={() => void handleCreateUser()} disabled={submitting}>
+              Creer le compte
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+      {error && (
+        <motion.div
+          variants={itemVariants}
+          className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-500 flex items-start gap-3"
+        >
+          <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <span>{error}</span>
+        </motion.div>
+      )}
+
+      <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
-          <p className="text-sm text-[var(--muted)]">Total</p>
-          <p className="text-2xl font-bold text-[var(--foreground)]">{stats.total}</p>
+          <p className="text-xs text-[var(--muted)]">Total users</p>
+          <p className="text-2xl font-bold text-[var(--foreground)]">{stats.users_total}</p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
-          <p className="text-sm text-[var(--muted)]">Admins</p>
-          <p className="text-2xl font-bold text-purple-500">{stats.admins}</p>
+          <p className="text-xs text-[var(--muted)]">Admins</p>
+          <p className="text-2xl font-bold text-purple-500">{stats.admins_total}</p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
-          <p className="text-sm text-[var(--muted)]">Clients</p>
-          <p className="text-2xl font-bold text-blue-500">{stats.clients}</p>
+          <p className="text-xs text-[var(--muted)]">Clients</p>
+          <p className="text-2xl font-bold text-blue-500">{stats.clients_total}</p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
-          <p className="text-sm text-[var(--muted)]">Actifs</p>
-          <p className="text-2xl font-bold text-green-500">{stats.active}</p>
+          <p className="text-xs text-[var(--muted)]">Inscriptions aujourd hui</p>
+          <p className="text-2xl font-bold text-emerald-500">{stats.registrations_today}</p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
-          <p className="text-sm text-[var(--muted)]">Inactifs</p>
-          <p className="text-2xl font-bold text-red-500">{stats.inactive}</p>
+          <p className="text-xs text-[var(--muted)]">Visiteurs jour</p>
+          <p className="text-2xl font-bold text-amber-500">{stats.visitors_today}</p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
-          <p className="text-sm text-[var(--muted)]">2FA activé</p>
-          <p className="text-2xl font-bold text-[var(--primary)]">{stats.with2FA}</p>
+          <p className="text-xs text-[var(--muted)]">Visiteurs semaine</p>
+          <p className="text-2xl font-bold text-amber-500">{stats.visitors_week}</p>
+        </div>
+        <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
+          <p className="text-xs text-[var(--muted)]">Visiteurs mois</p>
+          <p className="text-2xl font-bold text-amber-500">{stats.visitors_month}</p>
+        </div>
+        <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
+          <p className="text-xs text-[var(--muted)]">Visiteurs annee</p>
+          <p className="text-2xl font-bold text-amber-500">{stats.visitors_year}</p>
         </div>
       </motion.div>
 
-      {/* Filters */}
-      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4">
+      <motion.div variants={itemVariants} className="flex flex-col lg:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" />
           <input
             type="text"
-            placeholder="Rechercher un utilisateur..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Rechercher par nom..."
             className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
           />
         </div>
         <select
           value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
+          onChange={(event) => {
+            setRoleFilter(event.target.value as "all" | "admin" | "client");
+            setPage(1);
+          }}
           className="px-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
         >
-          <option value="">Tous les rôles</option>
+          <option value="all">Tous les roles</option>
           <option value="admin">Administrateur</option>
           <option value="client">Client</option>
         </select>
+        <select
+          value={periodFilter}
+          onChange={(event) => setPeriodFilter(event.target.value as VisitorPeriod)}
+          className="px-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+        >
+          {periodOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              Visiteurs {option.label.toLowerCase()}
+            </option>
+          ))}
+        </select>
       </motion.div>
 
-      {/* Users Table */}
       <motion.div variants={itemVariants} className="bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden">
+        <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-[var(--primary)]" />
+            <p className="font-semibold text-[var(--foreground)]">Liste utilisateurs</p>
+          </div>
+          {selectedUsersCount > 0 && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="gap-2"
+              onClick={() => void handleDeleteSelected()}
+              disabled={submitting}
+            >
+              <Trash2 className="w-4 h-4" />
+              Supprimer selection ({selectedUsersCount})
+            </Button>
+          )}
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[980px]">
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--background)]">
-                <th className="text-left py-4 px-6 text-sm font-medium text-[var(--muted)]">Utilisateur</th>
-                <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">Rôle</th>
-                <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">Statut</th>
-                <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">2FA</th>
-                <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">Dernière connexion</th>
-                <th className="text-left py-4 px-4 text-sm font-medium text-[var(--muted)]">Inscription</th>
-                <th className="text-right py-4 px-6 text-sm font-medium text-[var(--muted)]">Actions</th>
+                <th className="text-left py-3 px-4">
+                  <Checkbox
+                    checked={isAllCurrentUsersSelected}
+                    onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))}
+                    aria-label="Selectionner tous les utilisateurs"
+                  />
+                </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">Utilisateur</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">Role</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">Statut</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">2FA</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">Derniere connexion</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">Inscription</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-[var(--muted)]">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]/50 transition-colors">
-                  <td className="py-4 px-6">
+              {users.map((user) => (
+                <tr
+                  key={user.id}
+                  className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]/40 transition-colors"
+                >
+                  {(() => {
+                    const isCurrentAdmin = actingAdmin?.id === user.id;
+                    const rowLoading = mutationUserId === user.id && submitting;
+                    const canDelete = !isCurrentAdmin && user.role !== "admin";
+                    const canToggleActive = !isCurrentAdmin;
+                    const canChangeRole = !isCurrentAdmin;
+
+                    return (
+                      <>
+                  <td className="py-3 px-4">
+                    <Checkbox
+                      checked={selectedUserIds.includes(user.id)}
+                      onCheckedChange={() => toggleUser(user.id)}
+                      aria-label={`Selectionner ${user.full_name || user.id}`}
+                      disabled={user.role === "admin" || isCurrentAdmin}
+                    />
+                  </td>
+                  <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-full flex items-center justify-center">
+                      <div className="w-10 h-10 bg-[var(--primary)]/10 rounded-full flex items-center justify-center overflow-hidden">
                         {user.avatar_url ? (
-                          <img src={user.avatar_url} alt={user.full_name} className="w-10 h-10 rounded-full" />
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={user.avatar_url} alt={user.full_name || "Utilisateur"} className="w-full h-full object-cover" />
                         ) : (
                           <User className="w-5 h-5 text-[var(--primary)]" />
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-[var(--foreground)]">{user.full_name || 'Sans nom'}</p>
-                        <p className="text-sm text-[var(--muted)]">{user.email}</p>
+                        <p className="font-medium text-[var(--foreground)]">
+                          {user.full_name || "Sans nom"}
+                        </p>
+                        <p className="text-xs text-[var(--muted)]">
+                          {user.email || "Email non disponible"}
+                        </p>
+                        <p className="text-xs text-[var(--muted)] font-mono">{user.id}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="py-4 px-4">
-                    <span className={cn(
-                      'px-2 py-1 rounded-full text-xs font-medium border',
-                      user.role === 'admin'
-                        ? 'bg-purple-500/10 text-purple-500 border-purple-500/20'
-                        : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                    )}>
-                      {user.role === 'admin' ? 'Administrateur' : 'Client'}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className={cn(
-                      'flex items-center gap-1.5 text-sm',
-                      user.is_active ? 'text-green-500' : 'text-red-500'
-                    )}>
-                      {user.is_active ? (
-                        <>
-                          <UserCheck className="w-4 h-4" />
-                          Actif
-                        </>
-                      ) : (
-                        <>
-                          <UserX className="w-4 h-4" />
-                          Inactif
-                        </>
+                  <td className="py-3 px-4">
+                    <select
+                      value={user.role}
+                      onChange={(event) =>
+                        void handleRoleChange(
+                          user,
+                          event.target.value as "admin" | "client",
+                        )
+                      }
+                      disabled={submitting || rowLoading || !canChangeRole}
+                      className={cn(
+                        "px-2 py-1 rounded-full text-xs font-medium border bg-transparent",
+                        user.role === "admin"
+                          ? "text-purple-500 border-purple-500/20"
+                          : "text-blue-500 border-blue-500/20",
                       )}
+                    >
+                      <option value="client">Client</option>
+                      <option value="admin">Administrateur</option>
+                    </select>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 text-sm",
+                        user.is_active ? "text-green-500" : "text-red-500",
+                      )}
+                    >
+                      {user.is_active ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+                      {user.is_active ? "Actif" : "Inactif"}
                     </span>
                   </td>
-                  <td className="py-4 px-4">
-                    {user.two_fa_enabled ? (
-                      <span className="flex items-center gap-1.5 text-sm text-green-500">
-                        <ShieldCheck className="w-4 h-4" />
-                        Activé
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 text-sm text-[var(--muted)]">
-                        <Shield className="w-4 h-4" />
-                        Désactivé
-                      </span>
-                    )}
+                  <td className="py-3 px-4">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 text-sm",
+                        user.two_fa_enabled ? "text-emerald-500" : "text-[var(--muted)]",
+                      )}
+                    >
+                      <Shield className="w-4 h-4" />
+                      {user.two_fa_enabled ? "Active" : "Inactive"}
+                    </span>
                   </td>
-                  <td className="py-4 px-4 text-sm text-[var(--muted)]">
-                    {user.last_login_at ? formatDate(user.last_login_at) : 'Jamais'}
+                  <td className="py-3 px-4 text-sm text-[var(--muted)]">
+                    {user.last_login_at ? formatDate(user.last_login_at) : "Jamais"}
                   </td>
-                  <td className="py-4 px-4 text-sm text-[var(--muted)]">
-                    {formatDate(user.created_at)}
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setSelectedUser(user)}
-                        className="p-2 hover:bg-[var(--background)] rounded-lg transition-colors"
-                        title="Voir détails"
-                      >
-                        <Eye className="w-4 h-4 text-[var(--muted)]" />
-                      </button>
-                      <button
-                        className="p-2 hover:bg-[var(--background)] rounded-lg transition-colors"
-                        title={user.is_active ? 'Désactiver' : 'Activer'}
+                  <td className="py-3 px-4 text-sm text-[var(--muted)]">{formatDate(user.created_at)}</td>
+                  <td className="py-3 px-4">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "border-[var(--border)]",
+                          user.is_active
+                            ? "text-amber-500 hover:bg-amber-500/10"
+                            : "text-emerald-500 hover:bg-emerald-500/10",
+                        )}
+                        onClick={() => void handleToggleUserActive(user)}
+                        disabled={submitting || rowLoading || !canToggleActive}
                       >
                         {user.is_active ? (
-                          <Ban className="w-4 h-4 text-red-500" />
+                          <>
+                            <Lock className="w-4 h-4 mr-1" />
+                            Bloquer
+                          </>
                         ) : (
-                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <>
+                            <Unlock className="w-4 h-4 mr-1" />
+                            Debloquer
+                          </>
                         )}
-                      </button>
-                      <button
-                        className="p-2 hover:bg-[var(--background)] rounded-lg transition-colors"
-                        title="Révoquer les sessions"
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-red-500 border-red-500/30 hover:bg-red-500/10"
+                        onClick={() => void handleDeleteUser(user)}
+                        disabled={submitting || rowLoading || !canDelete}
                       >
-                        <LogOut className="w-4 h-4 text-[var(--muted)]" />
-                      </button>
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Supprimer
+                      </Button>
                     </div>
+                  </td>
+                      </>
+                    );
+                  })()}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {users.length === 0 && !loading && (
+          <div className="p-8 text-center text-[var(--muted)]">Aucun utilisateur trouve.</div>
+        )}
+
+        <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-between gap-3">
+          <p className="text-sm text-[var(--muted)]">
+            {meta.total} utilisateur{meta.total > 1 ? "s" : ""} au total
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              Precedent
+            </Button>
+            <span className="text-sm text-[var(--muted)]">
+              Page {meta.page} / {meta.totalPages}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page >= meta.totalPages || loading}
+              onClick={() => setPage((current) => Math.min(meta.totalPages, current + 1))}
+            >
+              Suivant
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+
+      <motion.div variants={itemVariants} className="bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden">
+        <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-amber-500" />
+            <p className="font-semibold text-[var(--foreground)]">
+              Liste visiteurs non connectes ({visitorsPeriodLabel})
+            </p>
+          </div>
+          <p className="text-sm text-[var(--muted)]">{visitors.length} visiteurs affiches</p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px]">
+            <thead>
+              <tr className="border-b border-[var(--border)] bg-[var(--background)]">
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">Visiteur</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">Sources</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">Pays</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">Evenements</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">Premiere activite</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">Derniere activite</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--muted)]">User agent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visitors.map((visitor) => (
+                <tr
+                  key={visitor.id}
+                  className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]/40 transition-colors"
+                >
+                  <td className="py-3 px-4">
+                    <div className="font-mono text-sm text-[var(--foreground)]">{shortVisitorId(visitor.id)}</div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex flex-wrap gap-1">
+                      {visitor.sources.map((source) => (
+                        <span
+                          key={`${visitor.id}-${source}`}
+                          className="px-2 py-0.5 rounded-full text-xs border border-[var(--border)] bg-[var(--background)] text-[var(--muted)]"
+                        >
+                          {source}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 text-sm text-[var(--foreground)]">
+                    {visitor.country_code || "--"}
+                  </td>
+                  <td className="py-3 px-4 text-sm text-[var(--foreground)]">{visitor.events}</td>
+                  <td className="py-3 px-4 text-sm text-[var(--muted)]">{formatDate(visitor.first_seen)}</td>
+                  <td className="py-3 px-4 text-sm text-[var(--muted)]">{formatDate(visitor.last_seen)}</td>
+                  <td className="py-3 px-4 text-xs text-[var(--muted)] max-w-[340px] truncate">
+                    {visitor.user_agent || "Non disponible"}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {visitors.length === 0 && !loading && (
+          <div className="p-8 text-center text-[var(--muted)]">Aucun visiteur trouve pour cette periode.</div>
+        )}
       </motion.div>
 
-      {/* User Detail Modal */}
-      {selectedUser && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-[var(--card)] rounded-2xl max-w-lg w-full"
-          >
-            <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
-              <h2 className="text-xl font-bold text-[var(--foreground)]">Détails utilisateur</h2>
-              <button onClick={() => setSelectedUser(null)} className="p-2 hover:bg-[var(--background)] rounded-lg">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-[var(--primary)]/10 rounded-full flex items-center justify-center">
-                  <User className="w-8 h-8 text-[var(--primary)]" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-[var(--foreground)]">
-                    {selectedUser.full_name || 'Sans nom'}
-                  </h3>
-                  <p className="text-sm text-[var(--muted)]">{selectedUser.email}</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[var(--background)] rounded-xl p-4">
-                  <p className="text-sm text-[var(--muted)]">Rôle</p>
-                  <p className="font-medium text-[var(--foreground)]">
-                    {selectedUser.role === 'admin' ? 'Administrateur' : 'Client'}
-                  </p>
-                </div>
-                <div className="bg-[var(--background)] rounded-xl p-4">
-                  <p className="text-sm text-[var(--muted)]">Statut</p>
-                  <p className={cn('font-medium', selectedUser.is_active ? 'text-green-500' : 'text-red-500')}>
-                    {selectedUser.is_active ? 'Actif' : 'Inactif'}
-                  </p>
-                </div>
-                <div className="bg-[var(--background)] rounded-xl p-4">
-                  <p className="text-sm text-[var(--muted)]">2FA</p>
-                  <p className={cn('font-medium', selectedUser.two_fa_enabled ? 'text-green-500' : 'text-[var(--muted)]')}>
-                    {selectedUser.two_fa_enabled ? 'Activé' : 'Désactivé'}
-                  </p>
-                </div>
-                <div className="bg-[var(--background)] rounded-xl p-4">
-                  <p className="text-sm text-[var(--muted)]">Inscription</p>
-                  <p className="font-medium text-[var(--foreground)]">{formatDate(selectedUser.created_at)}</p>
-                </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <Button variant="outline" className="flex-1 gap-2">
-                  <Users className="w-4 h-4" />
-                  Voir sessions
-                </Button>
-                <Button variant="outline" className="flex-1 gap-2 text-red-500 hover:bg-red-500/10">
-                  <Ban className="w-4 h-4" />
-                  {selectedUser.is_active ? 'Désactiver' : 'Activer'}
-                </Button>
-              </div>
-            </div>
-          </motion.div>
+      <motion.div variants={itemVariants} className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <CalendarDays className="w-4 h-4 text-[var(--primary)]" />
+          <h2 className="font-semibold text-[var(--foreground)]">Visiteurs par jour (14 derniers jours)</h2>
         </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+          {visitorDaily.map((entry) => (
+            <div key={entry.date} className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-3">
+              <p className="text-xs text-[var(--muted)]">{entry.date}</p>
+              <p className="text-xl font-bold text-[var(--foreground)] mt-2">{entry.visitors}</p>
+              <p className="text-xs text-[var(--muted)] mt-1 flex items-center gap-1">
+                <Clock3 className="w-3 h-3" />
+                visiteurs
+              </p>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+
+      {loading && (
+        <motion.div variants={itemVariants} className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 text-center">
+          <p className="text-[var(--muted)]">Chargement des donnees...</p>
+        </motion.div>
       )}
     </motion.div>
   );

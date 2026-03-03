@@ -40,12 +40,17 @@ export async function POST(request: NextRequest) {
                 .from(bucketName)
                 .getPublicUrl(filePath);
 
-            return publicUrl.publicUrl;
+            return {
+                url: publicUrl.publicUrl,
+                path: filePath,
+                bucket: bucketName,
+            };
         });
 
-        const urls = await Promise.all(uploadPromises);
+        const filesData = await Promise.all(uploadPromises);
+        const urls = filesData.map((file) => file.url);
 
-        return NextResponse.json({ urls });
+        return NextResponse.json({ urls, files: filesData });
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Failed to upload files';
         console.error('Upload error:', error);

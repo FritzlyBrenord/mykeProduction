@@ -19,8 +19,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { formatPrice, getStatusColor, getStatusLabel } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { getPrimaryProductImage, normalizeProductType } from '@/lib/products';
 import { useProduits, useDeleteProduit } from '@/hooks/useAdmin';
 import { ProductDetailModal } from '@/components/admin/ProductDetailModal';
+import { Produit } from '@/lib/types';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -48,22 +50,24 @@ export default function ProduitsPage() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Produit | null>(null);
   
-  const { data: produits = [], isLoading } = useProduits({ 
+  const { data: produits = [], isLoading, isError, error } = useProduits({ 
     type: typeFilter || undefined, 
     status: statusFilter || undefined 
   });
+  const produitsList = (produits ?? []) as Produit[];
   
   const deleteProduit = useDeleteProduit();
 
-  const filteredProduits = produits.filter((produit: any) => {
-    if (search && !produit.name.toLowerCase().includes(search.toLowerCase())) return false;
+  const filteredProduits = produitsList.filter((produit) => {
+    const productName = String(produit?.name ?? '').toLowerCase();
+    if (search && !productName.includes(search.toLowerCase())) return false;
     return true;
   });
 
-  const lowStockCount = produits.filter(
-    (p: any) => p.type === 'chimique' && p.stock !== null && p.stock < 50
+  const lowStockCount = produitsList.filter(
+    (p) => p.type === 'chimique' && p.stock !== null && p.stock < 50
   ).length;
 
   const handleDelete = async (id: string) => {
@@ -112,18 +116,18 @@ export default function ProduitsPage() {
       <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
           <p className="text-sm text-[var(--muted)]">Total produits</p>
-          <p className="text-2xl font-bold text-[var(--foreground)]">{produits.length}</p>
+          <p className="text-2xl font-bold text-[var(--foreground)]">{produitsList.length}</p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
           <p className="text-sm text-[var(--muted)]">Chimiques</p>
           <p className="text-2xl font-bold text-red-500">
-            {produits.filter((p: any) => p.type === 'chimique').length}
+            {produitsList.filter((p) => p.type === 'chimique').length}
           </p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
           <p className="text-sm text-[var(--muted)]">En vedette</p>
           <p className="text-2xl font-bold text-[var(--primary)]">
-            {produits.filter((p: any) => p.featured).length}
+            {produitsList.filter((p) => p.featured).length}
           </p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
@@ -174,14 +178,23 @@ export default function ProduitsPage() {
           <Loader2 className="w-8 h-8 text-[var(--primary)] animate-spin" />
           <p className="text-[var(--muted)]">Chargement des produits...</p>
         </div>
+      ) : isError ? (
+        <div className="text-center py-20 bg-red-500/10 rounded-2xl border border-red-500/30">
+          <p className="text-red-600 font-medium">Erreur API produits</p>
+          <p className="text-sm text-red-500 mt-2">
+            {(error as Error)?.message || 'Impossible de recuperer les produits.'}
+          </p>
+        </div>
       ) : filteredProduits.length === 0 ? (
         <div className="text-center py-20 bg-[var(--card)] rounded-2xl border border-dashed border-[var(--border)]">
           <p className="text-[var(--muted)]">Aucun produit trouvé</p>
         </div>
       ) : (
         <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredProduits.map((produit: any) => {
-            const TypeIcon = typeIcons[produit.type as keyof typeof typeIcons];
+          {filteredProduits.map((produit) => {
+            const normalizedType = normalizeProductType(produit?.type);
+            const TypeIcon = typeIcons[normalizedType] ?? Box;
+            const primaryImage = getPrimaryProductImage(produit?.images);
             
             return (
               <div
@@ -190,9 +203,9 @@ export default function ProduitsPage() {
               >
                 {/* Image */}
                 <div className="relative aspect-square bg-gradient-to-br from-[var(--primary)]/10 to-[var(--primary-dark)]/10">
-                  {produit.images?.[0] ? (
+                  {primaryImage ? (
                     <img
-                      src={produit.images[0]}
+                      src={primaryImage}
                       alt={produit.name}
                       className="w-full h-full object-cover"
                     />
@@ -204,8 +217,8 @@ export default function ProduitsPage() {
                   
                   {/* Badges */}
                   <div className="absolute top-3 left-3 flex flex-wrap gap-2">
-                    <span className={cn('px-2 py-1 rounded-full text-xs font-medium border uppercase', typeColors[produit.type as keyof typeof typeColors])}>
-                      {produit.type}
+                    <span className={cn('px-2 py-1 rounded-full text-xs font-medium border uppercase', typeColors[normalizedType])}>
+                      {normalizedType}
                     </span>
                     {produit.featured && (
                       <span className="px-2 py-1 rounded-full text-xs font-medium bg-[var(--primary)] text-white">
@@ -249,7 +262,7 @@ export default function ProduitsPage() {
                   <h3 className="font-semibold text-[var(--foreground)] mb-2 line-clamp-1">{produit.name}</h3>
                   
                   {/* Chemical specific info */}
-                  {produit.type === 'chimique' && (
+                  {normalizedType === 'chimique' && (
                     <div className="space-y-1 mb-3">
                       {produit.cas_number && (
                         <p className="text-xs text-[var(--muted)]">CAS: {produit.cas_number}</p>
