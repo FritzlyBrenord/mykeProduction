@@ -1,26 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const supabaseAdmin = createAdminClient();
-
 /**
  * Endpoint pour forcer la publication des formations planifiées
  * Publie toutes les formations où scheduled_publish_at <= maintenant
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = createAdminClient();
+    if (!supabaseAdmin) {
+      throw new Error("Failed to initialize admin client");
+    }
+
     const now = new Date().toISOString();
 
     console.log(`[API] Vérification des formations à publier - ${now}`);
 
     // Récupérer toutes les formations planifiées dont l'heure est arrivée
-    const { data: scheduledFormations, error: fetchError } = await supabaseAdmin
+    type ScheduledFormation = { id: string; title: string; scheduled_publish_at: string | null; scheduled_timezone: string | null; status: string };
+    const { data: scheduledFormationsRaw, error: fetchError } = await supabaseAdmin
       .from("formations")
       .select("id, title, scheduled_publish_at, scheduled_timezone, status")
       .eq("status", "scheduled")
       .not("scheduled_publish_at", "is", null)
       .lte("scheduled_publish_at", now)
       .order("scheduled_publish_at", { ascending: true });
+
+    const scheduledFormations = (scheduledFormationsRaw || []) as ScheduledFormation[];
 
     if (fetchError) {
       console.error("[API] Erreur fetch:", fetchError);
@@ -47,8 +53,8 @@ export async function POST(request: NextRequest) {
 
       console.log(`[API] Publication de: ${formation.id} (${formation.title})`);
 
-      const { error: updateError } = await supabaseAdmin
-        .from("formations")
+      const { error: updateError } = await (supabaseAdmin
+        .from("formations") as any)
         .update({
           status: "published",
           published_at: publishedAt,
@@ -62,7 +68,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Log audit
-      const { error: auditError } = await supabaseAdmin.from("audit_logs").insert({
+      const { error: auditError } = await (supabaseAdmin.from("audit_logs") as any).insert({
         action: "update",
         table_name: "formations",
         record_id: formation.id,

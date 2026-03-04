@@ -1,14 +1,26 @@
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import {  supabaseAdmin  } from '@/lib/supabase-admin';
-
-const MAX_VIDEO_SIZE_BYTES = 500 * 1024 * 1024; // 500MB
+import {
+  ensureVideosBucketConfig,
+  formatBytes,
+  getErrorMessage,
+  getSafeVideoExtension,
+  isStoragePayloadTooLargeError,
+  sanitizeStorageSegment,
+  VIDEO_BUCKET_FILE_SIZE_LIMIT_BYTES,
+  VIDEO_MAX_UPLOAD_BYTES,
+} from '@/lib/video-upload';
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file');
-    const formationId = String(formData.get('formationId') || 'general');
+    const formationId = sanitizeStorageSegment(
+      typeof formData.get('formationId') === 'string'
+        ? String(formData.get('formationId'))
+        : 'general',
+    );
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: 'Video file is required' }, { status: 400 });
@@ -18,20 +30,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Only video files are allowed' }, { status: 400 });
     }
 
-    if (file.size > MAX_VIDEO_SIZE_BYTES) {
-      return NextResponse.json({ error: 'Video exceeds 500MB limit' }, { status: 400 });
+    if (file.size > VIDEO_MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        { error: `Video exceeds application limit (${formatBytes(VIDEO_MAX_UPLOAD_BYTES)}).` },
+        { status: 413 },
+      );
     }
 
-    const ext = (file.name.split('.').pop() || 'mp4').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const safeExt = ext || 'mp4';
-    const filePath = `formations/${formationId}/${randomUUID()}.${safeExt}`;
+    await ensureVideosBucketConfig(supabaseAdmin);
 
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const safeExt = getSafeVideoExtension(file.name);
+    const filePath = `formations/${formationId}/${randomUUID()}.${safeExt}`;
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from('videos')
-      .upload(filePath, buffer, {
+      .upload(filePath, file, {
         contentType: file.type,
         upsert: false,
       });
@@ -47,10 +60,22 @@ export async function POST(request: NextRequest) {
       contentType: file.type,
       size: file.size,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Formation video upload error:', error);
+
+    if (isStoragePayloadTooLargeError(error)) {
+      return NextResponse.json(
+        {
+          error: `The uploaded file exceeds your Supabase bucket limit. Current target limit: ${formatBytes(
+            VIDEO_BUCKET_FILE_SIZE_LIMIT_BYTES,
+          )}.`,
+        },
+        { status: 413 },
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Failed to upload video' },
+      { error: getErrorMessage(error, 'Failed to upload video') },
       { status: 500 }
     );
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { X, Upload, Check, AlertCircle, Loader } from "lucide-react";
 import { useVideoUpload } from "@/hooks/useVideoUpload";
 import { useVideoThumbnailUpload } from "@/hooks/useVideoThumbnailUpload";
@@ -39,15 +39,6 @@ export function VideoUpload({
   const [youtubeError, setYoutubeError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (currentUrl) {
-      setPreviewUrl(currentUrl);
-    }
-    if (currentThumbnail) {
-      setThumbnailUrl(currentThumbnail);
-    }
-  }, [currentUrl, currentThumbnail]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -236,7 +227,7 @@ export function VideoUpload({
             </p>
             <div className="relative aspect-video rounded-lg overflow-hidden bg-black border border-[var(--border)]">
               <iframe
-                src={previewUrl}
+                src={previewUrl ?? undefined}
                 width="100%"
                 height="100%"
                 frameBorder="0"
@@ -267,7 +258,7 @@ export function VideoUpload({
       <label className="block text-sm font-medium text-[var(--foreground)] mb-3">
         Fichier vidéo
         <span className="text-xs text-[var(--muted)] font-normal ml-1">
-          (Max 500MB)
+          (longue duree autorisee)
         </span>
       </label>
 
@@ -297,7 +288,7 @@ export function VideoUpload({
               ou cliquez pour sélectionner
             </p>
             <p className="text-xs text-[var(--muted)] mt-2">
-              MP4, WebM, Ogg... jusqu'à 500MB
+              MP4, WebM, Ogg... limite selon bucket Supabase
             </p>
           </div>
         </div>

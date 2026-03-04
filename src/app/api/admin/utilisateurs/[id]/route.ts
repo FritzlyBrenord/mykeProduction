@@ -178,6 +178,9 @@ export async function PATCH(
 
     if (role !== undefined || fullName !== undefined) {
       const adminClient = createAdminClient();
+      if (!adminClient) {
+        throw new Error("Failed to initialize admin client");
+      }
       const { data: authData } = await adminClient.auth.admin.getUserById(id);
       const currentAppMetadata =
         (authData.user?.app_metadata as Record<string, unknown> | undefined) ||

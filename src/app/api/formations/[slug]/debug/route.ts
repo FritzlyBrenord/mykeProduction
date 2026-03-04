@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
 
 export async function GET(
   request: NextRequest,
@@ -11,8 +10,7 @@ export async function GET(
     const slug = resolvedParams.slug;
     console.log("Debug API - Slug reçu:", slug);
     
-    const cookieStore = await cookies();
-    const supabase = await createClient(cookieStore);
+    const supabase = await createClient();
     console.log("Debug API - Client Supabase créé:", !!supabase);
 
     // Vérifier l'authentification
@@ -54,14 +52,14 @@ export async function GET(
 
       // Test : chercher les leçons pour chaque module
       if (modules && modules.length > 0) {
-        for (const module of modules) {
-          console.log("Debug API - Recherche leçons pour module:", module.id);
+        for (const moduleRow of modules) {
+          console.log("Debug API - Recherche leçons pour module:", moduleRow.id);
           const { data: lessons, error: lessonsError } = await supabase
             .from("formation_lecons")
             .select("id, title, is_visible")
-            .eq("module_id", module.id);
+            .eq("module_id", moduleRow.id);
 
-          console.log("Debug API - Leçons pour module " + module.id + ":", {
+          console.log("Debug API - Leçons pour module " + moduleRow.id + ":", {
             count: lessons?.length || 0,
             error: lessonsError?.message,
             lessons: lessons

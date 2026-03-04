@@ -190,12 +190,13 @@ export default function FormationDetail({
           <div className="text-center py-16">
             <BookOpen className="w-16 h-16 text-[hsl(var(--muted-foreground))] mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-[hsl(var(--foreground))] mb-2">
-              Formation non trouvÃ©e
+              Formation non trouvée
             </h3>
             <p className="text-[hsl(var(--muted-foreground))] mb-6">
-              La formation que vous recherchez n'existe pas ou a Ã©tÃ© supprimÃ©e.
+              La formation que vous recherchez n'existe pas ou a été
+              supprimée.
             </p>
-            <Button onClick={onBack}>Retour Ã  la liste</Button>
+            <Button onClick={onBack}>Retour à la liste</Button>
           </div>
         </div>
       </div>
@@ -218,7 +219,8 @@ export default function FormationDetail({
   );
   const completedEnrollments = enrolledUsers.filter(
     (enrollment) =>
-      Boolean(enrollment.completed_at) || Number(enrollment.progress || 0) >= 100,
+      Boolean(enrollment.completed_at) ||
+      Number(enrollment.progress || 0) >= 100,
   ).length;
   const inProgressEnrollments = enrolledUsers.filter((enrollment) => {
     const progress = Number(enrollment.progress || 0);
@@ -233,7 +235,8 @@ export default function FormationDetail({
       ? Math.round(
           enrolledUsers.reduce(
             (sum, enrollment) =>
-              sum + Math.max(0, Math.min(100, Number(enrollment.progress || 0))),
+              sum +
+              Math.max(0, Math.min(100, Number(enrollment.progress || 0))),
             0,
           ) / enrolledUsers.length,
         )
@@ -322,7 +325,7 @@ export default function FormationDetail({
                       {formation.format === "video" ? (
                         <>
                           <Video className="w-4 h-4 inline mr-1" />
-                          VidÃ©o
+                          Vidéo
                         </>
                       ) : (
                         <>
@@ -332,7 +335,7 @@ export default function FormationDetail({
                       )}
                     </span>
                     <span className="text-sm text-[hsl(var(--muted-foreground))]">
-                      CrÃ©Ã©e le {formatDate(formation.created_at)}
+                      Créée le {formatDate(formation.created_at)}
                     </span>
                   </div>
                   <div className="text-right">
@@ -353,7 +356,7 @@ export default function FormationDetail({
                       <div className="flex items-center gap-2 mb-2">
                         <Calendar className="w-4 h-4 text-[hsl(var(--primary))]" />
                         <span className="text-sm font-semibold text-[hsl(var(--primary))]">
-                          Publication planifiÃ©e
+                          Publication planifiée
                         </span>
                       </div>
                       <p className="text-sm text-[hsl(var(--primary))] mb-2">
@@ -379,7 +382,7 @@ export default function FormationDetail({
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-emerald-500 rounded-full" />
                       <span className="text-sm text-emerald-500">
-                        PubliÃ©e le{" "}
+                        Publié le{" "}
                         {new Date(formation.published_at).toLocaleString(
                           "fr-FR",
                         )}
@@ -403,7 +406,7 @@ export default function FormationDetail({
                   </span>
                   <span className="flex items-center gap-1">
                     <Video className="w-4 h-4" />
-                    {totalLessons} leÃ§on{totalLessons > 1 ? "s" : ""}
+                    {totalLessons} leçon{totalLessons > 1 ? "s" : ""}
                   </span>
                 </div>
               </div>
@@ -444,7 +447,7 @@ export default function FormationDetail({
                               {module.intro_type && (
                                 <span className="px-2 py-1 text-xs bg-[hsl(var(--primary))/0.12] text-[hsl(var(--primary))] rounded">
                                   {module.intro_type === "video"
-                                    ? "Intro vidÃ©o"
+                                    ? "Intro vidéo"
                                     : "Intro texte"}
                                 </span>
                               )}
@@ -460,7 +463,7 @@ export default function FormationDetail({
                               {module.lecons?.filter(
                                 (l: any) => l.is_visible !== false,
                               ).length || 0}{" "}
-                              leÃ§on
+                              leçon
                               {(module.lecons?.filter(
                                 (l: any) => l.is_visible !== false,
                               ).length || 0) !== 1
@@ -495,7 +498,7 @@ export default function FormationDetail({
                                   <div className="flex items-center gap-2">
                                     <PlayCircle className="w-4 h-4 text-[hsl(var(--primary))]" />
                                     <span className="text-sm font-semibold text-[hsl(var(--primary))]">
-                                      Introduction vidÃ©o (
+                                      Introduction vidéo (
                                       {module.intro_video_type})
                                     </span>
                                   </div>
@@ -527,12 +530,12 @@ export default function FormationDetail({
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
                                           <h4 className="font-semibold text-[hsl(var(--foreground))]">
-                                            LeÃ§on {lessonIdx + 1}:{" "}
+                                            Leçon {lessonIdx + 1}:{" "}
                                             {lesson.title}
                                           </h4>
                                           {lesson.is_preview && (
                                             <span className="ml-2 text-xs bg-emerald-500/15 text-emerald-500 rounded px-2 py-0.5">
-                                              AperÃ§u gratuit
+                                              Aperçu gratuit
                                             </span>
                                           )}
                                         </div>
@@ -546,7 +549,7 @@ export default function FormationDetail({
                                             <span className="flex items-center gap-1">
                                               <Video className="w-3 h-3" />
                                               {lesson.video_type === "upload"
-                                                ? "VidÃ©o uploadÃ©e"
+                                                ? "Vidéo uploadée"
                                                 : lesson.video_type}
                                             </span>
                                           )}
@@ -569,7 +572,7 @@ export default function FormationDetail({
                                               {expandedLessons.has(lesson.id)
                                                 ? "Masquer"
                                                 : "Afficher"}{" "}
-                                              la vidÃ©o
+                                              la vidéo
                                             </button>
                                             {expandedLessons.has(lesson.id) && (
                                               <Preview
@@ -608,35 +611,43 @@ export default function FormationDetail({
                   <div className="text-2xl font-bold text-[hsl(var(--foreground))]">
                     {totalModules}
                   </div>
-                  <div className="text-xs text-[hsl(var(--muted-foreground))]">Modules</div>
+                  <div className="text-xs text-[hsl(var(--muted-foreground))]">
+                    Modules
+                  </div>
                 </div>
                 <div className="text-center p-3 bg-emerald-500/10 rounded-lg">
                   <Video className="w-6 h-6 text-emerald-500 mx-auto mb-1" />
                   <div className="text-2xl font-bold text-[hsl(var(--foreground))]">
                     {totalLessons}
                   </div>
-                  <div className="text-xs text-[hsl(var(--muted-foreground))]">LeÃ§ons</div>
+                  <div className="text-xs text-[hsl(var(--muted-foreground))]">
+                    Leçons
+                  </div>
                 </div>
                 <div className="text-center p-3 bg-indigo-500/10 rounded-lg">
                   <Users className="w-6 h-6 text-indigo-500 mx-auto mb-1" />
                   <div className="text-2xl font-bold text-[hsl(var(--foreground))]">
                     {totalEnrolled}
                   </div>
-                  <div className="text-xs text-[hsl(var(--muted-foreground))]">Inscrits</div>
+                  <div className="text-xs text-[hsl(var(--muted-foreground))]">
+                    Inscrits
+                  </div>
                 </div>
                 <div className="text-center p-3 bg-amber-500/10 rounded-lg">
                   <Star className="w-6 h-6 text-amber-500 mx-auto mb-1" />
                   <div className="text-2xl font-bold text-[hsl(var(--foreground))]">
                     {formation.rating_avg || "-"}
                   </div>
-                  <div className="text-xs text-[hsl(var(--muted-foreground))]">Note</div>
+                  <div className="text-xs text-[hsl(var(--muted-foreground))]">
+                    Note
+                  </div>
                 </div>
               </div>
             </div>
             {showStatistics && (
               <div className="bg-[hsl(var(--card))] rounded-2xl shadow-sm border border-[hsl(var(--border))] p-6">
                 <h3 className="text-lg font-bold text-[hsl(var(--foreground))] mb-1">
-                  Statistiques detaillees
+                  Statistiques détaillées
                 </h3>
                 <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
                   Suivi des progressions pour cette formation.
@@ -658,7 +669,7 @@ export default function FormationDetail({
                     <div className="flex items-center gap-2 mb-1">
                       <Award className="w-4 h-4 text-emerald-500" />
                       <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                        Taux de completion
+                        Taux de complétion
                       </span>
                     </div>
                     <p className="text-lg font-bold text-[hsl(var(--foreground))]">
@@ -671,7 +682,7 @@ export default function FormationDetail({
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span className="text-[hsl(var(--muted-foreground))]">
-                        Termines
+                        Terminés
                       </span>
                       <span className="font-semibold text-[hsl(var(--foreground))]">
                         {completedEnrollments}/{totalEnrolled}
@@ -705,7 +716,7 @@ export default function FormationDetail({
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span className="text-[hsl(var(--muted-foreground))]">
-                        Non commences
+                        Non commencés
                       </span>
                       <span className="font-semibold text-[hsl(var(--foreground))]">
                         {notStartedEnrollments}/{totalEnrolled}
@@ -765,7 +776,7 @@ export default function FormationDetail({
                 <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
                   {totalEnrolled} personne
                   {totalEnrolled > 1 ? "s" : ""} inscrite
-                  {totalEnrolled > 1 ? "s" : ""} a cette formation.
+                  {totalEnrolled > 1 ? "s" : ""} à cette formation.
                 </p>
 
                 {enrolledUsers.length === 0 ? (
@@ -798,7 +809,7 @@ export default function FormationDetail({
                             </p>
                             {enrollment.completed_at ? (
                               <p className="text-xs text-emerald-500 mt-1">
-                                Termine
+                                Terminé
                               </p>
                             ) : (
                               <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">

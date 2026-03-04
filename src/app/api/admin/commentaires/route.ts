@@ -12,7 +12,7 @@ type AdminCommentRow = {
 type ParentCommentRow = {
     id: string;
     content: string;
-    user?: { full_name: string | null; avatar_url: string | null } | null;
+    user?: { full_name: string | null; avatar_url: string | null }[] | null;
 };
 
 // GET /api/admin/commentaires - List all comments

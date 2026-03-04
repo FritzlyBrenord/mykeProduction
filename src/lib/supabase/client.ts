@@ -1,12 +1,15 @@
 ﻿"use client";
 
-import type { Database } from "@/types/database.types";
+import type { Database } from "@/types/supabase";
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-let browserClient: SupabaseClient<Database> | undefined;
+let browserClient: SupabaseClient<Database, "public"> | undefined;
 
-export function createClient(url?: string, anonKey?: string) {
+export function createClient(
+  url?: string,
+  anonKey?: string,
+): SupabaseClient<Database, "public"> {
   if (browserClient) {
     return browserClient;
   }
@@ -18,12 +21,13 @@ export function createClient(url?: string, anonKey?: string) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
   }
   
-  browserClient = createBrowserClient<Database>(finalUrl, finalAnonKey, {
+  const client = createBrowserClient<Database, "public">(finalUrl, finalAnonKey, {
     cookieOptions: {
       path: "/",
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
     },
   });
-  return browserClient;
+  browserClient = client;
+  return client;
 }

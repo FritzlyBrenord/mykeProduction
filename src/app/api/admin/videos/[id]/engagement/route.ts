@@ -67,7 +67,7 @@ export async function GET(
         id: string;
         full_name: string | null;
         avatar_url: string | null;
-      } | null;
+      }[] | null;
     }> = [];
 
     const { count: likesFromTable, error: likesError } = await supabaseAdmin
@@ -166,7 +166,7 @@ export async function GET(
         id: string;
         full_name: string | null;
         avatar_url: string | null;
-      } | null;
+      }[] | null;
     }> = [];
     let filteredTotal = 0;
 

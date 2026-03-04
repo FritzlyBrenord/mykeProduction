@@ -3,10 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Calendar, Clock, MessageCircle, Sparkles } from "lucide-react";
+import { Calendar, Clock, MessageCircle, ArrowRight, BookOpen } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Article } from "@/lib/types";
 import { formatDate } from "@/lib/utils/format";
 
@@ -20,8 +18,6 @@ interface ArticleCardProps {
   variant?: "default" | "horizontal" | "featured";
 }
 
-const editorialHeadlineClass = "font-[family-name:var(--font-playfair)]";
-
 export default function ArticleCard({
   article,
   index = 0,
@@ -29,188 +25,193 @@ export default function ArticleCard({
 }: ArticleCardProps) {
   const publishedDate = formatDate(article.published_at || article.created_at);
 
-  if (variant === "horizontal") {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, delay: index * 0.05 }}
-      >
-        <Link href={`/articles/${article.slug}`}>
-          <Card className="group overflow-hidden border-amber-200/70 bg-white/90 backdrop-blur hover:shadow-xl hover:shadow-amber-900/10 transition-all duration-500">
-            <div className="grid grid-cols-1 sm:grid-cols-[220px,1fr]">
-              <div className="relative h-56 sm:h-full overflow-hidden">
-                <Image
-                  src={article.thumbnail_url || "/images/placeholder-article.svg"}
-                  alt={article.title}
-                  fill
-                  className="object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
-              </div>
-
-              <CardContent className="p-6">
-                <div className="flex flex-wrap items-center gap-2 mb-3 text-xs text-slate-500">
-                  {article.category && (
-                    <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">
-                      {article.category.name}
-                    </Badge>
-                  )}
-                  <span className="inline-flex items-center gap-1">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {publishedDate}
-                  </span>
-                </div>
-
-                <h3
-                  className={`${editorialHeadlineClass} text-2xl font-semibold text-slate-900 leading-tight mb-3 group-hover:text-amber-900 transition-colors`}
-                >
-                  {article.title}
-                </h3>
-
-                <p
-                  className="text-slate-600 leading-relaxed line-clamp-3"
-                  style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-                >
-                  {article.excerpt}
-                </p>
-
-                <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                  {article.reading_time && (
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5" />
-                      {article.reading_time} min de lecture
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-1">
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    {article.comment_count ?? 0} commentaires
-                  </span>
-                </div>
-              </CardContent>
-            </div>
-          </Card>
-        </Link>
-      </motion.div>
-    );
-  }
-
   if (variant === "featured") {
     return (
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.55 }}
+        transition={{ duration: 0.6 }}
       >
-        <Link href={`/articles/${article.slug}`}>
-          <Card className="group overflow-hidden border-amber-200/70 shadow-lg shadow-amber-950/10 hover:shadow-2xl hover:shadow-amber-950/15 transition-all duration-500 bg-white/95">
-            <div className="relative aspect-[16/8] overflow-hidden">
+        <Link href={`/articles/${article.slug}`} className="group block">
+          <div className="relative overflow-hidden rounded-2xl bg-white border border-stone-200 shadow-xl shadow-stone-900/8 transition-all duration-500 hover:shadow-2xl hover:shadow-stone-900/12">
+            {/* Image */}
+            <div className="relative aspect-[21/9] overflow-hidden">
               <Image
                 src={article.thumbnail_url || "/images/placeholder-article.svg"}
                 alt={article.title}
                 fill
-                className="object-cover transition-transform duration-700 group-hover:scale-105"
+                className="object-cover transition-transform duration-700 group-hover:scale-103"
+                priority
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-stone-950/85 via-stone-950/30 to-transparent" />
 
-              <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
-                <div className="flex items-center gap-2 text-amber-100 mb-3">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="text-xs uppercase tracking-[0.2em]">Edition du moment</span>
-                </div>
-
+              {/* Top label */}
+              <div className="absolute top-5 left-6 flex items-center gap-2">
                 {article.category && (
-                  <Badge className="mb-3 bg-amber-200 text-amber-950 hover:bg-amber-200">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-white shadow-sm">
                     {article.category.name}
-                  </Badge>
+                  </span>
                 )}
-
-                <h3 className={`${editorialHeadlineClass} text-3xl md:text-4xl font-semibold text-white leading-tight mb-3`}>
-                  {article.title}
-                </h3>
-
-                <p
-                  className="text-white/85 max-w-3xl line-clamp-2"
-                  style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-                >
-                  {article.excerpt}
-                </p>
-
-                <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-white/80">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4" />
-                    {publishedDate}
-                  </span>
-                  {article.reading_time && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <Clock className="h-4 w-4" />
-                      {article.reading_time} min
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-1.5">
-                    <MessageCircle className="h-4 w-4" />
-                    {article.comment_count ?? 0} commentaires
-                  </span>
-                </div>
+                <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[10px] uppercase tracking-widest text-white backdrop-blur-sm">
+                  À la une
+                </span>
               </div>
             </div>
-          </Card>
+
+            {/* Content overlay */}
+            <div className="absolute inset-x-0 bottom-0 px-7 pb-7 pt-16">
+              <h3 className="font-[family-name:var(--font-playfair)] text-[2rem] font-bold leading-tight text-white drop-shadow-sm md:text-[2.6rem]">
+                {article.title}
+              </h3>
+              {article.excerpt && (
+                <p className="mt-3 max-w-3xl text-base leading-relaxed text-white/80 line-clamp-2" style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
+                  {article.excerpt}
+                </p>
+              )}
+              <div className="mt-5 flex flex-wrap items-center gap-5 text-sm text-white/70">
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5" />
+                  {publishedDate}
+                </span>
+                {article.reading_time && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
+                    {article.reading_time} min de lecture
+                  </span>
+                )}
+                {(article.comment_count ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    {article.comment_count} commentaires
+                  </span>
+                )}
+                <span className="ml-auto hidden items-center gap-1.5 text-amber-300 transition-all group-hover:gap-3 sm:inline-flex">
+                  Lire l&apos;article <ArrowRight className="h-4 w-4" />
+                </span>
+              </div>
+            </div>
+          </div>
         </Link>
       </motion.div>
     );
   }
 
+  if (variant === "horizontal") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: index * 0.05 }}
+      >
+        <Link href={`/articles/${article.slug}`} className="group block">
+          <div className="flex gap-5 rounded-xl border border-stone-200 bg-white p-4 shadow-sm transition-all duration-300 hover:border-stone-300 hover:shadow-md">
+            <div className="relative h-28 w-40 flex-shrink-0 overflow-hidden rounded-lg">
+              <Image
+                src={article.thumbnail_url || "/images/placeholder-article.svg"}
+                alt={article.title}
+                fill
+                className="object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+            </div>
+            <div className="flex flex-1 flex-col justify-between">
+              {article.category && (
+                <span className="mb-1 inline-block text-[10px] font-bold uppercase tracking-widest text-amber-600">
+                  {article.category.name}
+                </span>
+              )}
+              <h3 className="font-[family-name:var(--font-playfair)] text-lg font-bold leading-snug text-stone-900 transition-colors group-hover:text-amber-800 line-clamp-2">
+                {article.title}
+              </h3>
+              <div className="mt-2 flex items-center gap-3 text-xs text-stone-400">
+                <span className="inline-flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {publishedDate}
+                </span>
+                {article.reading_time && (
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {article.reading_time} min
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </Link>
+      </motion.div>
+    );
+  }
+
+  // Default card
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay: index * 0.06 }}
+      transition={{ duration: 0.45, delay: index * 0.07 }}
     >
-      <Link href={`/articles/${article.slug}`}>
-        <Card className="group h-full overflow-hidden border-amber-200/70 bg-white/90 hover:bg-white transition-all duration-500 hover:shadow-xl hover:shadow-amber-900/10">
-          <div className="relative aspect-[4/3] overflow-hidden">
+      <Link href={`/articles/${article.slug}`} className="group block h-full">
+        <div className="flex h-full flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition-all duration-400 hover:border-stone-300 hover:shadow-lg hover:-translate-y-0.5">
+          {/* Image */}
+          <div className="relative aspect-[16/9] overflow-hidden">
             <Image
               src={article.thumbnail_url || "/images/placeholder-article.svg"}
               alt={article.title}
               fill
-              className="object-cover transition-transform duration-700 group-hover:scale-105"
+              className="object-cover transition-transform duration-600 group-hover:scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
             {article.category && (
               <div className="absolute top-3 left-3">
-                <Badge className="bg-white/90 text-slate-900 hover:bg-white/90">
+                <span className="inline-block rounded-full bg-amber-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white shadow-sm">
                   {article.category.name}
-                </Badge>
+                </span>
               </div>
             )}
           </div>
 
-          <CardContent className="p-5">
-            <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+          {/* Content */}
+          <div className="flex flex-1 flex-col p-5">
+            {/* Date */}
+            <div className="mb-3 flex items-center gap-3 text-[11px] text-stone-400">
               <span className="inline-flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5" />
+                <Calendar className="h-3 w-3" />
                 {publishedDate}
               </span>
               {article.reading_time && (
                 <span className="inline-flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" />
+                  <Clock className="h-3 w-3" />
                   {article.reading_time} min
+                </span>
+              )}
+              {(article.comment_count ?? 0) > 0 && (
+                <span className="inline-flex items-center gap-1 ml-auto">
+                  <MessageCircle className="h-3 w-3" />
+                  {article.comment_count}
                 </span>
               )}
             </div>
 
-            <h3 className={`${editorialHeadlineClass} text-xl font-semibold text-slate-900 mb-3 leading-tight group-hover:text-amber-900 transition-colors line-clamp-2`}>
+            {/* Title */}
+            <h3 className="font-[family-name:var(--font-playfair)] text-lg font-bold leading-snug text-stone-900 transition-colors group-hover:text-amber-800 line-clamp-2 flex-1">
               {article.title}
             </h3>
 
-            <p
-              className="text-slate-600 line-clamp-3"
-              style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-            >
-              {article.excerpt}
-            </p>
-          </CardContent>
-        </Card>
+            {/* Excerpt */}
+            {article.excerpt && (
+              <p className="mt-2 text-sm leading-relaxed text-stone-500 line-clamp-2" style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
+                {article.excerpt}
+              </p>
+            )}
+
+            {/* Footer */}
+            <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-4">
+              <span className="flex items-center gap-1.5 text-xs text-stone-400">
+                <BookOpen className="h-3.5 w-3.5" />
+                Lire l&apos;article
+              </span>
+              <ArrowRight className="h-4 w-4 text-amber-500 transition-transform duration-300 group-hover:translate-x-1" />
+            </div>
+          </div>
+        </div>
       </Link>
     </motion.div>
   );

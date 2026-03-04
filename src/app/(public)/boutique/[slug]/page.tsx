@@ -564,7 +564,7 @@ export default function BoutiqueProductDetailPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {produit.content && (
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 lg:p-8">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 lg:p-8 text-gray-800">
                 <h2 className="font-[family-name:var(--font-playfair)] text-2xl font-semibold text-slate-900 mb-4">
                   Description détaillée
                 </h2>

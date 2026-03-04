@@ -2,24 +2,28 @@ import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { NextResponse } from 'next/server';
 
+interface FormationSummary {
+  id: string;
+  title: string;
+  slug: string;
+  thumbnail_url: string | null;
+  duration_hours: number | null;
+  language: string | null;
+  level: string | null;
+  is_free: boolean;
+  price: number;
+  created_at: string;
+}
+
+type RelatedOneOrMany<T> = T | T[] | null;
+
 interface EnrollmentRow {
   id: string;
   formation_id: string;
   enrolled_at: string;
   completed_at: string | null;
   progress: number | null;
-  formation: {
-    id: string;
-    title: string;
-    slug: string;
-    thumbnail_url: string | null;
-    duration_hours: number | null;
-    language: string | null;
-    level: string | null;
-    is_free: boolean;
-    price: number;
-    created_at: string;
-  } | null;
+  formation: RelatedOneOrMany<FormationSummary>;
 }
 
 interface OrderRow {
@@ -31,19 +35,13 @@ interface OrderRow {
     item_type: 'produit' | 'formation' | 'video';
     formation_id: string | null;
     total_price: number;
-    formation: {
-      id: string;
-      title: string;
-      slug: string;
-      thumbnail_url: string | null;
-      duration_hours: number | null;
-      language: string | null;
-      level: string | null;
-      is_free: boolean;
-      price: number;
-      created_at: string;
-    } | null;
+    formation: RelatedOneOrMany<FormationSummary>;
   }>;
+}
+
+function getSingleRelation<T>(relation: T | T[] | null | undefined): T | null {
+  if (Array.isArray(relation)) return relation[0] ?? null;
+  return relation ?? null;
 }
 
 export async function GET() {
@@ -131,19 +129,20 @@ export async function GET() {
 
     const pendingFormationById = new Map<
       string,
-      {
-        order_id: string;
-        order_status: string;
-        ordered_at: string;
-        item_total_price: number;
-        formation: NonNullable<OrderRow['items'][number]['formation']>;
-      }
-    >();
+        {
+          order_id: string;
+          order_status: string;
+          ordered_at: string;
+          item_total_price: number;
+          formation: FormationSummary;
+        }
+      >();
 
     const orders = (ordersRaw ?? []) as OrderRow[];
     for (const order of orders) {
       for (const item of order.items ?? []) {
-        if (item.item_type !== 'formation' || !item.formation_id || !item.formation) {
+        const itemFormation = getSingleRelation(item.formation);
+        if (item.item_type !== 'formation' || !item.formation_id || !itemFormation) {
           continue;
         }
 
@@ -160,7 +159,7 @@ export async function GET() {
           order_status: order.status,
           ordered_at: order.created_at,
           item_total_price: Number(item.total_price ?? 0),
-          formation: item.formation,
+          formation: itemFormation,
         });
       }
     }

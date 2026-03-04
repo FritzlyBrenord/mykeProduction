@@ -3,26 +3,27 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 const supabaseAdmin = createAdminClient();
 
-/**
- * Fonction pour publier automatiquement les formations planifiées
- * Check toutes les formations avec un scheduled_publish_at <= maintenant
- * S'exécute toutes les 2 minutes pour plus de réactivité
- */
+type ScheduledFormation = {
+  id: string;
+  title: string | null;
+  scheduled_publish_at: string | null;
+  scheduled_timezone: string | null;
+  status: string;
+};
+
 export const publishScheduledFormations = inngest.createFunction(
   { id: "publish-scheduled-formations" },
-  { cron: "*/2 * * * *" }, // Toutes les 2 minutes (plus réactif)
+  { cron: "*/2 * * * *" },
   async ({ step }) => {
-    const now = new Date();
-    const nowISO = now.toISOString();
+    const nowISO = new Date().toISOString();
 
-    console.log(`[Inngest] Vérification des formations à publier - ${nowISO}`);
+    console.log(`[Inngest] Check scheduled formations - ${nowISO}`);
 
-    // Récupérer toutes les formations planifiées dont l'heure est arrivée
-    const { data: scheduledFormations, error: fetchError } = await step.run(
+    const scheduledFormations = await step.run(
       "fetch-scheduled-formations",
-      async () => {
-        const { data, error } = await supabaseAdmin
-          .from("formations")
+      async (): Promise<ScheduledFormation[]> => {
+        const { data, error } = await (supabaseAdmin
+          .from("formations") as any)
           .select("id, title, scheduled_publish_at, scheduled_timezone, status")
           .eq("status", "scheduled")
           .not("scheduled_publish_at", "is", null)
@@ -30,37 +31,32 @@ export const publishScheduledFormations = inngest.createFunction(
           .order("scheduled_publish_at", { ascending: true });
 
         if (error) {
-          console.error("[Inngest] Erreur lors de la récupération des formations:", error);
+          console.error("[Inngest] Failed to fetch scheduled formations:", error);
           throw error;
         }
 
-        console.log(`[Inngest] Formations trouvées à publier: ${(data || []).length}`);
-        return data || [];
-      }
+        const rows = (data ?? []) as ScheduledFormation[];
+        console.log(`[Inngest] Scheduled formations found: ${rows.length}`);
+        return rows;
+      },
     );
 
-    if (fetchError) {
-      console.error("[Inngest] Erreur fetch:", fetchError);
-      throw fetchError;
-    }
-
-    if (!scheduledFormations || scheduledFormations.length === 0) {
-      console.log("[Inngest] Aucune formation à publier pour cette vérification");
+    if (scheduledFormations.length === 0) {
+      console.log("[Inngest] Nothing to publish on this run");
       return { message: "No formations to publish", checked: true };
     }
 
-    console.log(`[Inngest] Publication de ${scheduledFormations.length} formation(s)...`);
+    console.log(`[Inngest] Publishing ${scheduledFormations.length} formation(s)`);
 
-    // Publier chaque formation
     const publishResults = await Promise.all(
-      scheduledFormations.map((formation: any) =>
+      scheduledFormations.map((formation) =>
         step.run(`publish-formation-${formation.id}`, async () => {
           const publishedAt = new Date().toISOString();
-          
-          console.log(`[Inngest] Publication de la formation: ${formation.id} (${formation.title})`);
 
-          const { error: updateError } = await supabaseAdmin
-            .from("formations")
+          console.log(`[Inngest] Publishing formation ${formation.id} (${formation.title ?? "Untitled"})`);
+
+          const { error: updateError } = await (supabaseAdmin
+            .from("formations") as any)
             .update({
               status: "published",
               published_at: publishedAt,
@@ -69,26 +65,25 @@ export const publishScheduledFormations = inngest.createFunction(
             .eq("id", formation.id);
 
           if (updateError) {
-            console.error(`[Inngest] Erreur lors de la publication de ${formation.id}:`, updateError);
+            console.error(`[Inngest] Failed publishing ${formation.id}:`, updateError);
             throw updateError;
           }
 
-          // Log audit
-          const { error: auditError } = await supabaseAdmin.from("audit_logs").insert({
-            action: "update",
-            table_name: "formations",
-            record_id: formation.id,
-            changes: {
-              status: "draft → published",
-              published_at: publishedAt,
-            },
-          });
+          const { error: auditError } = await (supabaseAdmin
+            .from("audit_logs") as any)
+            .insert({
+              action: "update",
+              table_name: "formations",
+              record_id: formation.id,
+              changes: {
+                status: "draft -> published",
+                published_at: publishedAt,
+              },
+            });
 
           if (auditError) {
-            console.warn(`[Inngest] Erreur audit log pour ${formation.id}:`, auditError);
+            console.warn(`[Inngest] Audit log warning for ${formation.id}:`, auditError);
           }
-
-          console.log(`[Inngest] ✅ Formation publiée avec succès: ${formation.id}`);
 
           return {
             formationId: formation.id,
@@ -96,16 +91,16 @@ export const publishScheduledFormations = inngest.createFunction(
             scheduledTime: formation.scheduled_publish_at,
             publishedAt,
           };
-        })
-      )
+        }),
+      ),
     );
 
-    console.log(`[Inngest] Résultat: ${publishResults.length} formation(s) publiée(s)`);
+    console.log(`[Inngest] Published ${publishResults.length} formation(s)`);
 
     return {
       message: `Published ${publishResults.length} formations`,
       totalPublished: publishResults.length,
       published: publishResults,
     };
-  }
+  },
 );

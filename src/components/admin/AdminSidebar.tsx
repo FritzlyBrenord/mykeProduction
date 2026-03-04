@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -68,11 +68,7 @@ const navItems: NavItem[] = [
       { label: "Commandes", href: "/admin/produits/commandes" },
     ],
   },
-  {
-    label: "Inventaire Chimique",
-    href: "/admin/inventaire-chimique",
-    icon: FlaskConical,
-  },
+
   {
     label: "Vidéos",
     href: "/admin/videos",
@@ -87,26 +83,6 @@ const navItems: NavItem[] = [
     label: "Paiements",
     href: "/admin/paiements",
     icon: CreditCard,
-  },
-  {
-    label: "Coupons",
-    href: "/admin/coupons",
-    icon: Tag,
-  },
-  {
-    label: "Audit Logs",
-    href: "/admin/audit-logs",
-    icon: Shield,
-  },
-  {
-    label: "Newsletter",
-    href: "/admin/newsletter",
-    icon: Mail,
-  },
-  {
-    label: "Paramètres",
-    href: "/admin/parametres",
-    icon: Settings,
   },
 ];
 
@@ -213,8 +189,13 @@ export default function AdminSidebar() {
   const { isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen } =
     useSidebar();
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSignOut = async () => {
     if (isSigningOut) return;
@@ -310,14 +291,18 @@ export default function AdminSidebar() {
               isCollapsed && "justify-center px-2",
             )}
           >
-            {theme === "dark" ? (
-              <Sun className="w-5 h-5" />
+            {mounted ? (
+              theme === "dark" ? (
+                <Sun className="w-5 h-5" />
+              ) : (
+                <Moon className="w-5 h-5" />
+              )
             ) : (
-              <Moon className="w-5 h-5" />
+              <div className="w-5 h-5 opacity-0" />
             )}
             {!isCollapsed && (
               <span className="font-medium">
-                {theme === "dark" ? "Clair" : "Sombre"}
+                {mounted ? (theme === "dark" ? "Clair" : "Sombre") : "Thème"}
               </span>
             )}
           </button>

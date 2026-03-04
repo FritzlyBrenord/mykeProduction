@@ -21,10 +21,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const RESEND_COOLDOWN_SECONDS = 60;
+
+type ProfileGateRow = {
+  role: "admin" | "client" | null;
+  is_active: boolean | null;
+  deleted_at: string | null;
+};
 
 function formatDuration(ms: number) {
   const safeMs = Math.max(0, ms);
@@ -49,6 +55,7 @@ function normalizeNextPath(value: string | null) {
 async function resolvePostLoginPath(nextPath: string | null) {
   const safeNextPath = normalizeNextPath(nextPath);
   const supabase = createClient();
+  const profiles = () => supabase.from("profiles" as any) as any;
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -57,11 +64,10 @@ async function resolvePostLoginPath(nextPath: string | null) {
     return { target: "/", blocked: false };
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
+  const { data: profile } = (await profiles()
     .select("role,is_active,deleted_at")
     .eq("id", user.id)
-    .maybeSingle();
+    .maybeSingle()) as { data: ProfileGateRow | null };
 
   const isBlocked = profile
     ? profile.is_active === false || Boolean(profile.deleted_at)
@@ -90,7 +96,7 @@ async function resolvePostLoginPath(nextPath: string | null) {
   return { target: "/", blocked: false };
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -590,5 +596,13 @@ export default function LoginPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white py-20" />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

@@ -1,0 +1,10 @@
+{
+  "tailwindCSS.validate": false,
+  "tailwindCSS.lint.suggestCanonicalClasses": "ignore",
+  "[typescriptreact]": {
+    "tailwindCSS.lint.suggestCanonicalClasses": "ignore"
+  },
+  "[javascriptreact]": {
+    "tailwindCSS.lint.suggestCanonicalClasses": "ignore"
+  }
+}

@@ -54,6 +54,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type ElementType,
   type ChangeEvent,
@@ -190,9 +191,13 @@ const RichTextEditor = ({
     uploadConfig?.imageEndpoint ?? "/api/admin/formations/upload-image";
   const videoUploadEndpoint =
     uploadConfig?.videoEndpoint ?? "/api/admin/formations/upload-video";
-  const videoUploadFormData = uploadConfig?.videoFormData ?? {
-    formationId: "general",
-  };
+  const videoUploadFormData = useMemo(
+    () =>
+      uploadConfig?.videoFormData ?? {
+        formationId: "general",
+      },
+    [uploadConfig?.videoFormData]
+  );
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -325,37 +330,80 @@ const RichTextEditor = ({
         return;
       }
 
-      const endpoint = isVideo ? videoUploadEndpoint : imageUploadEndpoint;
-      const formData = new FormData();
-      formData.append("file", file);
-
-      if (isVideo) {
-        Object.entries(videoUploadFormData).forEach(([key, value]) => {
-          formData.append(key, value);
-        });
-      }
-
       setMediaError("");
       setUploadingMedia(true);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          body: formData,
-        });
+        let uploadedUrl: string | null = null;
 
-        const payload = (await response
-          .json()
-          .catch(() => null)) as { url?: string; error?: string } | null;
+        if (isVideo && videoUploadEndpoint === "/api/admin/formations/upload-video") {
+          const initResponse = await fetch("/api/admin/formations/upload-video/init", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileName: file.name,
+              fileType: file.type,
+              fileSize: file.size,
+              formationId: videoUploadFormData.formationId || "general",
+            }),
+          });
 
-        if (!response.ok || !payload?.url) {
-          throw new Error(payload?.error || "Upload media echoue.");
+          const initPayload = (await initResponse
+            .json()
+            .catch(() => null)) as { signedUrl?: string; url?: string; error?: string } | null;
+
+          if (!initResponse.ok || !initPayload?.signedUrl || !initPayload.url) {
+            throw new Error(initPayload?.error || "Upload media echoue.");
+          }
+
+          const directUploadResponse = await fetch(initPayload.signedUrl, {
+            method: "PUT",
+            headers: {
+              "Content-Type": file.type || "application/octet-stream",
+            },
+            body: file,
+          });
+
+          if (!directUploadResponse.ok) {
+            throw new Error("Upload media echoue.");
+          }
+
+          uploadedUrl = initPayload.url;
+        } else {
+          const endpoint = isVideo ? videoUploadEndpoint : imageUploadEndpoint;
+          const formData = new FormData();
+          formData.append("file", file);
+
+          if (isVideo) {
+            Object.entries(videoUploadFormData).forEach(([key, value]) => {
+              formData.append(key, value);
+            });
+          }
+
+          const response = await fetch(endpoint, {
+            method: "POST",
+            body: formData,
+          });
+
+          const payload = (await response
+            .json()
+            .catch(() => null)) as { url?: string; error?: string } | null;
+
+          if (!response.ok || !payload?.url) {
+            throw new Error(payload?.error || "Upload media echoue.");
+          }
+
+          uploadedUrl = payload.url;
+        }
+
+        if (!uploadedUrl) {
+          throw new Error("Upload media echoue.");
         }
 
         if (isVideo) {
-          insertVideo(payload.url);
+          insertVideo(uploadedUrl);
         } else {
-          editor.chain().focus().setImage({ src: payload.url }).run();
+          editor.chain().focus().setImage({ src: uploadedUrl }).run();
         }
 
         setMediaUrl("");

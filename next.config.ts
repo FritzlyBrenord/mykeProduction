@@ -3,6 +3,10 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  experimental: {
+    // Required for large multipart uploads that pass through middleware/proxy.
+    proxyClientMaxBodySize: "600mb",
+  },
   images: {
     remotePatterns: [
       {

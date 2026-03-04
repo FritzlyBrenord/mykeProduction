@@ -1,15 +1,16 @@
-'use client';
+"use client";
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { motion } from 'framer-motion';
-import { ArrowRight, CheckCircle, Clock, Mail, Package } from 'lucide-react';
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { motion } from "framer-motion";
+import { ArrowRight, CheckCircle, Clock, Mail, Package } from "lucide-react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessPageContent() {
   const searchParams = useSearchParams();
-  const orderId = searchParams.get('order');
+  const orderId = searchParams.get("order");
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center py-12 px-4">
@@ -24,13 +25,15 @@ export default function CheckoutSuccessPage() {
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: 'spring' }}
+              transition={{ delay: 0.2, type: "spring" }}
               className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6"
             >
               <CheckCircle className="h-12 w-12 text-green-600" />
             </motion.div>
 
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Commande confirmee</h1>
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+              Commande confirmee
+            </h1>
             <p className="text-slate-600 mb-6">
               Paiement simule valide. Vous recevrez un email de confirmation.
             </p>
@@ -38,15 +41,17 @@ export default function CheckoutSuccessPage() {
             <div className="bg-slate-50 rounded-lg p-6 mb-8 text-left">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-slate-500 mb-1">Numero de commande</p>
+                  <p className="text-sm text-slate-500 mb-1">
+                    Numero de commande
+                  </p>
                   <p className="font-semibold text-slate-900 break-all">
-                    {orderId || 'Indisponible'}
+                    #{orderId?.split("-")[0] || "Indisponible"}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-500 mb-1">Date</p>
                   <p className="font-semibold text-slate-900">
-                    {new Date().toLocaleDateString('fr-FR')}
+                    {new Date().toLocaleDateString("fr-FR")}
                   </p>
                 </div>
               </div>
@@ -57,7 +62,9 @@ export default function CheckoutSuccessPage() {
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-3">
                   <Mail className="h-6 w-6 text-blue-600" />
                 </div>
-                <p className="text-sm font-medium text-slate-900">Email client</p>
+                <p className="text-sm font-medium text-slate-900">
+                  Email client
+                </p>
                 <p className="text-xs text-slate-500">Confirmation envoyee</p>
               </div>
               <div className="flex flex-col items-center p-4">
@@ -71,8 +78,12 @@ export default function CheckoutSuccessPage() {
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3">
                   <Package className="h-6 w-6 text-green-600" />
                 </div>
-                <p className="text-sm font-medium text-slate-900">Suivi actif</p>
-                <p className="text-xs text-slate-500">Disponible dans Mes commandes</p>
+                <p className="text-sm font-medium text-slate-900">
+                  Suivi actif
+                </p>
+                <p className="text-xs text-slate-500">
+                  Disponible dans Mes commandes
+                </p>
               </div>
             </div>
 
@@ -81,7 +92,7 @@ export default function CheckoutSuccessPage() {
                 href={
                   orderId
                     ? `/compte/commandes/${encodeURIComponent(orderId)}`
-                    : '/compte/commandes'
+                    : "/compte/commandes"
                 }
               >
                 <Button variant="outline" className="w-full sm:w-auto">
@@ -104,5 +115,15 @@ export default function CheckoutSuccessPage() {
         </Card>
       </motion.div>
     </div>
+  );
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense
+      fallback={<div className="min-h-screen bg-slate-50 py-12 px-4" />}
+    >
+      <CheckoutSuccessPageContent />
+    </Suspense>
   );
 }

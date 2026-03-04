@@ -16,9 +16,11 @@ import {
   ChevronDown,
   ChevronRight,
   Eye,
+  Globe,
   Heart,
   Lock,
   MessageCircle,
+  Play,
   Reply,
   Send,
   ShoppingCart,
@@ -587,55 +589,51 @@ export default function VideoDetailPage() {
         key={commentItem.id}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={depth > 0 ? "mt-4 ml-6 border-l border-border pl-4" : ""}
+        className={
+          depth > 0 ? "mt-4 ml-6 border-l-2 border-slate-700/50 pl-4" : ""
+        }
       >
-        <div className="flex gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
-          <Avatar className="h-10 w-10 border border-border">
+        <div className="flex gap-3 rounded-xl border border-slate-700/30 bg-gradient-to-b from-slate-800/50 to-slate-900/30 p-4 shadow-lg shadow-black/10">
+          <Avatar className="h-10 w-10 border border-slate-700 ring-2 ring-slate-800">
             <AvatarImage src={commentItem.user?.avatar_url || undefined} />
-            <AvatarFallback>
+            <AvatarFallback className="bg-gradient-to-br from-slate-700 to-slate-800 text-slate-300 text-sm font-semibold">
               {commentItem.user?.full_name?.charAt(0) || "?"}
             </AvatarFallback>
           </Avatar>
 
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex flex-wrap items-center gap-2">
-              <span className="font-medium text-foreground">
+              <span className="font-semibold text-slate-200">
                 {commentItem.user?.full_name || "Utilisateur"}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-slate-500">
                 {formatDate(commentItem.created_at)}
               </span>
               {commentItem.status !== "approved" && (
-                <Badge
-                  variant="outline"
-                  className="text-[10px] uppercase tracking-wide"
-                >
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-400 border border-amber-500/20">
                   En attente
-                </Badge>
+                </span>
               )}
             </div>
 
-            <p className="mb-2 text-sm leading-6 text-muted-foreground">
+            <p className="mb-3 text-sm leading-6 text-slate-300">
               {commentItem.content}
             </p>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2"
+              <button
                 onClick={() => handleLikeComment(commentItem.id)}
                 disabled={isLiking || isLiked}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400 transition-all hover:bg-slate-700/50 hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Heart className="mr-1 h-4 w-4" />
+                <Heart
+                  className={`h-4 w-4 ${isLiked ? "fill-red-500 text-red-500" : ""}`}
+                />
                 {commentItem.likes}
-              </Button>
+              </button>
 
               {user && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2"
+                <button
                   onClick={() => {
                     if (isReplyOpen) {
                       setReplyTargetId(null);
@@ -645,43 +643,42 @@ export default function VideoDetailPage() {
                       setReplyText("");
                     }
                   }}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400 transition-all hover:bg-slate-700/50 hover:text-slate-200"
                 >
-                  <Reply className="mr-1 h-4 w-4" />
-                  Repondre
-                </Button>
+                  <Reply className="h-4 w-4" />
+                  Répondre
+                </button>
               )}
 
               {hasReplies && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2"
+                <button
                   onClick={() =>
                     setExpandedReplies((current) => ({
                       ...current,
                       [commentItem.id]: !repliesExpanded,
                     }))
                   }
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400 transition-all hover:bg-slate-700/50 hover:text-slate-200"
                 >
                   {repliesExpanded ? (
-                    <ChevronDown className="mr-1 h-4 w-4" />
+                    <ChevronDown className="h-4 w-4" />
                   ) : (
-                    <ChevronRight className="mr-1 h-4 w-4" />
+                    <ChevronRight className="h-4 w-4" />
                   )}
                   {repliesExpanded
                     ? "Masquer"
                     : `Voir ${commentItem.replies.length}`}
-                </Button>
+                </button>
               )}
             </div>
 
             {isReplyOpen && (
-              <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+              <div className="mt-3 rounded-xl border border-slate-700/30 bg-gradient-to-b from-slate-800/50 to-slate-900/50 p-3">
                 <Textarea
-                  placeholder="Ecrire une reponse..."
+                  placeholder="Écrire une réponse..."
                   value={replyText}
                   onChange={(event) => setReplyText(event.target.value)}
-                  className="mb-2"
+                  className="mb-3 border-slate-700/50 bg-slate-950/50 text-slate-100 placeholder:text-slate-500 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 min-h-[60px]"
                 />
                 <div className="flex justify-end gap-2">
                   <Button
@@ -692,6 +689,7 @@ export default function VideoDetailPage() {
                       setReplyTargetId(null);
                       setReplyText("");
                     }}
+                    className="border-slate-600 bg-slate-800/30 text-slate-300 hover:bg-slate-700 hover:text-white"
                   >
                     Annuler
                   </Button>
@@ -700,8 +698,9 @@ export default function VideoDetailPage() {
                     type="button"
                     onClick={() => handleSubmitReply(commentItem.id)}
                     disabled={!replyText.trim() || isSubmittingReply}
+                    className="bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40"
                   >
-                    {isSubmittingReply ? "Envoi..." : "Repondre"}
+                    {isSubmittingReply ? "Envoi..." : "Répondre"}
                   </Button>
                 </div>
               </div>
@@ -722,9 +721,12 @@ export default function VideoDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background pt-28">
-        <div className="mx-auto max-w-6xl px-4 text-center text-muted-foreground">
-          Chargement de la video...
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 pt-24">
+        <div className="mx-auto max-w-6xl px-4 text-center">
+          <div className="inline-flex items-center gap-2 text-slate-400">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+            Chargement de la vidéo...
+          </div>
         </div>
       </div>
     );
@@ -732,19 +734,29 @@ export default function VideoDetailPage() {
 
   if (!video || errorMessage) {
     return (
-      <div className="min-h-screen bg-background pt-28">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 pt-24">
         <div className="mx-auto max-w-3xl px-4 text-center">
-          <h1 className="text-2xl font-semibold text-foreground">
-            Video indisponible
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            {errorMessage || "Cette video n'est pas disponible pour le moment."}
-          </p>
-          <Link href="/videos">
-            <Button variant="outline" className="mt-5">
-              Retour aux videos
-            </Button>
-          </Link>
+          <div className="rounded-2xl border border-slate-700/30 bg-gradient-to-b from-slate-800/50 to-slate-900/50 p-12">
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-500/10">
+              <Play className="h-10 w-10 text-red-400" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-100">
+              Vidéo indisponible
+            </h1>
+            <p className="mt-3 text-slate-400">
+              {errorMessage ||
+                "Cette vidéo n'est pas disponible pour le moment."}
+            </p>
+            <Link href="/videos">
+              <Button
+                variant="outline"
+                className="mt-6 border-slate-600 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Retour aux vidéos
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -754,23 +766,36 @@ export default function VideoDetailPage() {
   const vimeoId = video.video_url ? extractVimeoId(video.video_url) : null;
 
   return (
-    <div className="min-h-screen bg-background pt-24 text-foreground">
-      <section className="border-b border-border bg-card/40">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <Link
-            href="/videos"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 pt-20 text-slate-100">
+      {/* ── BREADCRUMB HEADER ── */}
+      <div className="relative border-b border-slate-800/50 bg-gradient-to-r from-slate-900/80 to-slate-800/60 backdrop-blur-xl">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-500/10 via-transparent to-transparent opacity-50" />
+        <div className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
           >
-            <ArrowLeft className="h-4 w-4" />
-            Retour aux videos
-          </Link>
+            <Link
+              href="/videos"
+              className="inline-flex items-center gap-2 rounded-full bg-slate-800/50 px-4 py-2 text-sm text-slate-400 transition-all hover:bg-slate-700/50 hover:text-slate-200"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour aux vidéos
+            </Link>
+          </motion.div>
         </div>
-      </section>
+      </div>
 
-      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr),360px] lg:px-8">
-        <section className="space-y-5">
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            <div className="relative aspect-video bg-black">
+      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr),380px] lg:px-8">
+        {/* ── MAIN VIDEO SECTION ── */}
+        <section className="space-y-6">
+          {/* Video Player Container */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="overflow-hidden rounded-2xl border border-slate-700/30 bg-gradient-to-b from-slate-800/30 to-slate-900/30 shadow-2xl shadow-black/30"
+          >
+            <div className="relative aspect-video bg-gradient-to-br from-slate-950 to-slate-900">
               {video.can_watch ? (
                 <>
                   {video.video_type === "youtube" && youtubeId ? (
@@ -799,11 +824,11 @@ export default function VideoDetailPage() {
                       onContextMenu={(event) => event.preventDefault()}
                       playsInline
                     >
-                      Votre navigateur ne supporte pas la lecture video.
+                      Votre navigateur ne supporte pas la lecture vidéo.
                     </video>
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-sm text-white/70">
-                      Source video indisponible.
+                    <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">
+                      Source vidéo indisponible.
                     </div>
                   )}
                 </>
@@ -813,24 +838,30 @@ export default function VideoDetailPage() {
                     src={video.thumbnail_url || "/images/placeholder-video.svg"}
                     alt={video.title}
                     fill
-                    className="object-cover opacity-35"
+                    className="object-cover opacity-30"
                   />
-                  <div className="absolute inset-0 bg-black/60" />
-                  <div className="relative z-10 max-w-md px-6 text-center text-white">
-                    <Lock className="mx-auto mb-3 h-10 w-10 text-amber-300" />
-                    <p className="mb-2 text-xl font-semibold">
-                      Acces verrouille
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/50 to-slate-900/80" />
+                  <div className="relative z-10 max-w-md px-6 text-center">
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-2xl shadow-red-500/30"
+                    >
+                      <Lock className="h-8 w-8 text-white" />
+                    </motion.div>
+                    <p className="mb-2 text-xl font-bold text-white">
+                      Accès verrouillé
                     </p>
-                    <p className="mb-4 text-sm text-white/80">
+                    <p className="mb-6 text-sm text-slate-300">
                       {accessLabel(video)}
                     </p>
 
-                    <div className="flex flex-wrap items-center justify-center gap-2">
+                    <div className="flex flex-wrap items-center justify-center gap-3">
                       {video.requires_auth && (
                         <Link href="/auth/connexion">
                           <Button
                             size="sm"
-                            className="bg-white text-black hover:bg-white/90"
+                            className="bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40"
                           >
                             Se connecter
                           </Button>
@@ -842,6 +873,7 @@ export default function VideoDetailPage() {
                           size="sm"
                           onClick={handleAddToCart}
                           disabled={isAddingToCart}
+                          className="bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40"
                         >
                           <ShoppingCart className="mr-2 h-4 w-4" />
                           {isAddingToCart ? "Ajout..." : "Ajouter au panier"}
@@ -852,121 +884,170 @@ export default function VideoDetailPage() {
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
 
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Badge className="bg-amber-500 text-black hover:bg-amber-500">
-                <Sparkles className="mr-1 h-3 w-3" />
-                Detail premium
-              </Badge>
+          {/* Video Info Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="rounded-2xl border border-slate-700/30 bg-gradient-to-b from-slate-800/30 to-slate-900/30 p-6 shadow-xl shadow-black/20"
+          >
+            {/* Badges */}
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-red-500/20 to-red-600/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-red-400 border border-red-500/20">
+                <Sparkles className="h-3.5 w-3.5" />
+                Premium
+              </span>
               {video.access_type === "public" && (
-                <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-400 border border-emerald-500/20">
+                  <Globe className="h-3.5 w-3.5" />
                   Public
-                </Badge>
+                </span>
               )}
               {video.access_type === "members" && (
-                <Badge className="bg-blue-600 text-white hover:bg-blue-600">
-                  <Users className="mr-1 h-3 w-3" />
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-blue-400 border border-blue-500/20">
+                  <Users className="h-3.5 w-3.5" />
                   Membres
-                </Badge>
+                </span>
               )}
               {video.access_type === "paid" && (
-                <Badge className="bg-slate-900 text-white hover:bg-slate-900">
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-400 border border-red-500/20">
+                  <Lock className="h-3.5 w-3.5" />
                   {formatPrice(Number(video.price || 0), "USD")}
-                </Badge>
+                </span>
               )}
             </div>
 
-            <h1 className="text-2xl font-semibold sm:text-3xl">
+            <h1 className="text-2xl font-bold text-white sm:text-3xl lg:text-4xl">
               {video.title}
             </h1>
 
-            <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <Eye className="h-4 w-4" />
-                {compact(Number(video.view_count || 0))} vues
+            {/* Stats row */}
+            <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-400">
+              <span className="inline-flex items-center gap-2 rounded-full bg-slate-800/50 px-3 py-1.5">
+                <Eye className="h-4 w-4 text-slate-500" />
+                <span className="font-semibold text-slate-300">
+                  {compact(Number(video.view_count || 0))}
+                </span>{" "}
+                vues
               </span>
-              <span className="inline-flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                Publiee le {formatDate(video.created_at)}
+              <span className="inline-flex items-center gap-2 rounded-full bg-slate-800/50 px-3 py-1.5">
+                <Calendar className="h-4 w-4 text-slate-500" />
+                {formatDate(video.created_at)}
               </span>
-              <span className="inline-flex items-center gap-1">
-                <MessageCircle className="h-4 w-4" />
-                {displayedCommentTotal} commentaire
-                {displayedCommentTotal > 1 ? "s" : ""}
+              <span className="inline-flex items-center gap-2 rounded-full bg-slate-800/50 px-3 py-1.5">
+                <MessageCircle className="h-4 w-4 text-slate-500" />
+                <span className="font-semibold text-slate-300">
+                  {displayedCommentTotal}
+                </span>{" "}
+                commentaire{displayedCommentTotal > 1 ? "s" : ""}
               </span>
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleLikeVideo}
-                disabled={isLikingVideo || likedVideo || !video.can_watch}
+            {/* Action buttons */}
+            <div className="mt-6 flex flex-wrap gap-3">
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <Heart className="mr-2 h-4 w-4" />
-                {Number(video.like_count || 0)} j&apos;aime
-              </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLikeVideo}
+                  disabled={isLikingVideo || likedVideo || !video.can_watch}
+                  className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-red-500/50"
+                >
+                  <Heart
+                    className={`mr-2 h-4 w-4 ${likedVideo ? "fill-red-500 text-red-500" : ""}`}
+                  />
+                  {compact(Number(video.like_count || 0))} j&apos;aime
+                </Button>
+              </motion.div>
 
               <ShareButton
                 title={video.title}
-                text={video.description || "Regardez cette video"}
+                text={video.description || "Regardez cette vidéo"}
                 path={`/videos/${video.slug}`}
                 size="sm"
                 variant="outline"
-                className="text-black"
+                className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700"
               />
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  commentsRef.current?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                  })
-                }
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <MessageCircle className="mr-2 h-4 w-4" />
-                Commenter
-              </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    commentsRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    })
+                  }
+                  className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white"
+                >
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Commenter
+                </Button>
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-lg font-semibold">Description</h2>
-            <p className="mt-3 whitespace-pre-line text-sm leading-7 text-muted-foreground">
-              {video.description || "Aucune description disponible."}
-            </p>
-          </div>
+          {/* Description Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="rounded-2xl border border-slate-700/30 bg-gradient-to-b from-slate-800/30 to-slate-900/30 p-6 shadow-xl shadow-black/20"
+          >
+            <h2 className="flex items-center gap-2 text-lg font-bold text-white">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600">
+                <Sparkles className="h-4 w-4 text-white" />
+              </span>
+              Description
+            </h2>
+            <div className="mt-4 prose prose-invert max-w-none">
+              <p className="whitespace-pre-line text-sm leading-7 text-slate-300">
+                {video.description || "Aucune description disponible."}
+              </p>
+            </div>
+          </motion.div>
 
           {video.allow_comments && video.can_watch && (
-            <div
+            <motion.div
               ref={commentsRef}
-              className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="rounded-2xl border border-slate-700/30 bg-gradient-to-b from-slate-800/30 to-slate-900/30 p-6 shadow-xl shadow-black/20"
             >
-              <h2 className="text-xl font-semibold">
+              <h2 className="flex items-center gap-2 text-xl font-bold text-white mb-6">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600">
+                  <MessageCircle className="h-5 w-5 text-white" />
+                </span>
                 Commentaires ({displayedCommentTotal})
               </h2>
 
               {migrationRequired && (
-                <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
-                  Structure SQL des commentaires video non active. Appliquez la
+                <div className="mt-4 rounded-xl border border-red-500/30 bg-gradient-to-r from-red-500/10 to-red-900/10 p-4 text-sm text-red-400">
+                  Structure SQL des commentaires vidéo non active. Appliquez la
                   migration `015_video_social_features.sql`.
                 </div>
               )}
 
               <form
                 onSubmit={handleSubmitComment}
-                className="mt-5 rounded-xl border border-border bg-background/40 p-4"
+                className="mt-6 rounded-xl border border-slate-700/30 bg-gradient-to-b from-slate-800/50 to-slate-900/50 p-4"
               >
-                <div className="flex gap-3">
-                  <Avatar className="h-10 w-10 border border-border">
+                <div className="flex gap-4">
+                  <Avatar className="h-10 w-10 border border-slate-700 ring-2 ring-slate-800">
                     <AvatarImage src={user?.avatar_url || undefined} />
-                    <AvatarFallback>
+                    <AvatarFallback className="bg-gradient-to-br from-slate-700 to-slate-800 text-slate-300">
                       {user?.full_name?.charAt(0) || "?"}
                     </AvatarFallback>
                   </Avatar>
@@ -980,8 +1061,9 @@ export default function VideoDetailPage() {
                       value={commentText}
                       onChange={(event) => setCommentText(event.target.value)}
                       disabled={!user || migrationRequired}
+                      className="border-slate-700/50 bg-slate-950/50 text-slate-100 placeholder:text-slate-500 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 min-h-[80px]"
                     />
-                    <div className="mt-2 flex justify-end">
+                    <div className="mt-3 flex justify-end">
                       <Button
                         type="submit"
                         disabled={
@@ -990,6 +1072,7 @@ export default function VideoDetailPage() {
                           isSubmittingComment ||
                           migrationRequired
                         }
+                        className="bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40"
                       >
                         <Send className="mr-2 h-4 w-4" />
                         {isSubmittingComment ? "Envoi..." : "Publier"}
@@ -1000,23 +1083,31 @@ export default function VideoDetailPage() {
               </form>
 
               {commentsLoading ? (
-                <p className="mt-5 text-sm text-muted-foreground">
-                  Chargement des commentaires...
-                </p>
+                <div className="mt-6 flex items-center justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+                </div>
               ) : commentTree.length === 0 ? (
-                <p className="mt-5 text-sm text-muted-foreground">
-                  Aucun commentaire pour le moment.
-                </p>
+                <div className="mt-6 rounded-xl border border-slate-700/30 bg-slate-800/20 p-8 text-center">
+                  <MessageCircle className="mx-auto mb-3 h-10 w-10 text-slate-600" />
+                  <p className="text-slate-400">
+                    Aucun commentaire pour le moment. Soyez le premier à
+                    commenter !
+                  </p>
+                </div>
               ) : (
-                <div className="mt-5 space-y-4">
+                <div className="mt-6 space-y-4">
                   {commentTree.map((comment) => renderComment(comment))}
                 </div>
               )}
 
               {commentsMeta.totalPages > 1 && (
-                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background/40 p-4">
-                  <p className="text-sm text-muted-foreground">
-                    Page {commentsMeta.page} sur {commentsMeta.totalPages}
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700/30 bg-gradient-to-b from-slate-800/50 to-slate-900/50 p-4">
+                  <p className="text-sm text-slate-400">
+                    Page{" "}
+                    <span className="font-semibold text-slate-200">
+                      {commentsMeta.page}
+                    </span>{" "}
+                    / {commentsMeta.totalPages}
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -1028,8 +1119,9 @@ export default function VideoDetailPage() {
                         setExpandedReplies({});
                         setCommentsPage((current) => Math.max(1, current - 1));
                       }}
+                      className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white"
                     >
-                      Precedent
+                      Précédent
                     </Button>
                     <Button
                       type="button"
@@ -1045,78 +1137,116 @@ export default function VideoDetailPage() {
                           Math.min(commentsMeta.totalPages, current + 1),
                         );
                       }}
+                      className="border-slate-600 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white"
                     >
                       Suivant
                     </Button>
                   </div>
                 </div>
               )}
-            </div>
+            </motion.div>
           )}
         </section>
 
-        <aside className="space-y-4">
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <h3 className="mb-3 text-base font-semibold">Infos video</h3>
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <p>
-                <span className="font-medium text-foreground">Type:</span>{" "}
-                {video.video_type}
-              </p>
-              <p>
-                <span className="font-medium text-foreground">Acces:</span>{" "}
-                {accessLabel(video)}
-              </p>
-              <p>
-                <span className="font-medium text-foreground">Likes:</span>{" "}
-                {compact(Number(video.like_count || 0))}
-              </p>
-              <p>
-                <span className="font-medium text-foreground">
-                  Commentaires:
-                </span>{" "}
-                {displayedCommentTotal}
-              </p>
+        <aside className="space-y-6">
+          {/* Info Card */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="rounded-2xl border border-slate-700/30 bg-gradient-to-b from-slate-800/30 to-slate-900/30 p-5 shadow-xl shadow-black/10"
+          >
+            <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-white">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600">
+                <Sparkles className="h-4 w-4 text-white" />
+              </span>
+              Infos vidéo
+            </h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between rounded-lg bg-slate-800/30 px-3 py-2">
+                <span className="text-slate-400">Type</span>
+                <span className="font-medium text-slate-200 capitalize">
+                  {video.video_type}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-slate-800/30 px-3 py-2">
+                <span className="text-slate-400">Accès</span>
+                <span className="font-medium text-slate-200">
+                  {accessLabel(video)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-slate-800/30 px-3 py-2">
+                <span className="text-slate-400">J&apos;aime</span>
+                <span className="font-medium text-red-400">
+                  {compact(Number(video.like_count || 0))}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-slate-800/30 px-3 py-2">
+                <span className="text-slate-400">Commentaires</span>
+                <span className="font-medium text-slate-200">
+                  {displayedCommentTotal}
+                </span>
+              </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <h3 className="mb-3 text-base font-semibold">Videos similaires</h3>
+          {/* Related Videos Card */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+            className="rounded-2xl border border-slate-700/30 bg-gradient-to-b from-slate-800/30 to-slate-900/30 p-5 shadow-xl shadow-black/10"
+          >
+            <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-white">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600">
+                <Play className="h-4 w-4 text-white" />
+              </span>
+              Vidéos similaires
+            </h3>
             {related.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aucune video similaire disponible.
+              <p className="text-sm text-slate-400">
+                Aucune vidéo similaire disponible.
               </p>
             ) : (
               <div className="space-y-3">
-                {related.map((item) => (
-                  <Link
+                {related.map((item, index) => (
+                  <motion.div
                     key={item.id}
-                    href={`/videos/${item.slug}`}
-                    className="group flex gap-3 rounded-xl border border-border bg-background/30 p-2 transition hover:bg-background/70"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 + index * 0.1 }}
                   >
-                    <div className="relative h-20 w-32 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                      <Image
-                        src={
-                          item.thumbnail_url || "/images/placeholder-video.svg"
-                        }
-                        alt={item.title}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-sm font-medium text-foreground transition-colors group-hover:text-amber-600 dark:group-hover:text-amber-400">
-                        {item.title}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {compact(Number(item.view_count || 0))} vues
-                      </p>
-                    </div>
-                  </Link>
+                    <Link
+                      href={`/videos/${item.slug}`}
+                      className="group flex gap-3 rounded-xl border border-slate-700/30 bg-slate-800/20 p-2 transition-all hover:border-red-500/30 hover:bg-slate-800/40"
+                    >
+                      <div className="relative h-20 w-32 flex-shrink-0 overflow-hidden rounded-lg bg-slate-800">
+                        <Image
+                          src={
+                            item.thumbnail_url ||
+                            "/images/placeholder-video.svg"
+                          }
+                          alt={item.title}
+                          fill
+                          className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 to-transparent" />
+                      </div>
+                      <div className="min-w-0 flex-1 py-1">
+                        <p className="line-clamp-2 text-sm font-medium text-slate-200 transition-colors group-hover:text-red-400">
+                          {item.title}
+                        </p>
+                        <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                          <Eye className="h-3 w-3" />
+                          {compact(Number(item.view_count || 0))} vues
+                        </p>
+                      </div>
+                    </Link>
+                  </motion.div>
                 ))}
               </div>
             )}
-          </div>
+          </motion.div>
         </aside>
       </main>
     </div>

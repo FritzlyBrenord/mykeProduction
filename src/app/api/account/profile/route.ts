@@ -1,6 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+type ProfileApiRow = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  role: "client" | "admin" | null;
+  is_active: boolean | null;
+  deleted_at: string | null;
+  phone_encrypted: string | null;
+  country: string | null;
+  bio: string | null;
+  created_at: string | null;
+};
+
 function normalizeNullableText(value: unknown, maxLength: number) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -10,6 +23,7 @@ function normalizeNullableText(value: unknown, maxLength: number) {
 
 export async function GET() {
   const supabase = await createClient();
+  const profiles = () => supabase.from("profiles" as any) as any;
   const {
     data: { user },
     error: userError,
@@ -19,11 +33,10 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data, error } = await supabase
-    .from("profiles")
+  const { data, error } = (await profiles()
     .select("id, full_name, avatar_url, role, is_active, deleted_at, phone_encrypted, country, bio, created_at")
     .eq("id", user.id)
-    .maybeSingle();
+    .maybeSingle()) as { data: ProfileApiRow | null; error: { message: string } | null };
 
   if (error) {
     return NextResponse.json({ error: "Failed to load profile" }, { status: 500 });
@@ -46,6 +59,7 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   const supabase = await createClient();
+  const profiles = () => supabase.from("profiles" as any) as any;
   const {
     data: { user },
     error: userError,
@@ -84,11 +98,10 @@ export async function PATCH(request: NextRequest) {
     updated_at: new Date().toISOString(),
   };
 
-  const { data, error } = await supabase
-    .from("profiles")
+  const { data, error } = (await profiles()
     .upsert(payload, { onConflict: "id" })
     .select("id, full_name, avatar_url, role, is_active, deleted_at, phone_encrypted, country, bio, created_at")
-    .single();
+    .single()) as { data: ProfileApiRow; error: { message: string } | null };
 
   if (error) {
     return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });

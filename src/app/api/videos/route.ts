@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    const rows = (data ?? []) as Array<{
+    const rows = ((data ?? []) as unknown) as Array<{
       id: string;
       likes: number | null;
       allow_comments: boolean | null;

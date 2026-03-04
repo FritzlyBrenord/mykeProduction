@@ -20,6 +20,9 @@ function isRateLimitedError(message: string) {
 
 async function emailExistsInAuth(email: string) {
   const admin = createAdminClient();
+  if (!admin) {
+    return { exists: false, error: new Error("Failed to initialize admin client") };
+  }
 
   for (let page = 1; page <= USERS_MAX_PAGES; page += 1) {
     const { data, error } = await admin.auth.admin.listUsers({
@@ -87,6 +90,9 @@ export async function POST(request: NextRequest) {
   const redirectTo = `${appBaseUrl}/auth/reset-password`;
 
   const admin = createAdminClient();
+  if (!admin) {
+    return NextResponse.json({ error: "Service unavailable" }, { status: 500 });
+  }
   const { error } = await admin.auth.resetPasswordForEmail(email, { redirectTo });
 
   if (error) {

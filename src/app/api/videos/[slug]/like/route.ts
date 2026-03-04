@@ -40,7 +40,7 @@ async function fetchVideoWithFallback(slug: string) {
       .eq("status", "published")
       .is("deleted_at", null)
       .single();
-    data = fallback.data;
+    data = fallback.data ? ({ ...fallback.data, likes: null } as typeof data) : null;
     error = fallback.error;
   }
 

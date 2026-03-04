@@ -7,6 +7,7 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import VisitorTracker from "@/components/analytics/VisitorTracker";
 import { Toaster } from "sonner";
+import { Suspense } from "react";
 
 function roleFromMetadata(metadata: unknown): "client" | "admin" {
   if (!metadata || typeof metadata !== "object") return "client";
@@ -78,7 +79,9 @@ export default async function PublicLayout({
       <AuthProvider initialUser={initialUser}>
         <CartProvider>
           <Providers>
-            <VisitorTracker />
+            <Suspense fallback={null}>
+              <VisitorTracker />
+            </Suspense>
             <Navbar />
             <main className="flex-1">{children}</main>
             <Footer />

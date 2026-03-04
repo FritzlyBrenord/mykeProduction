@@ -82,7 +82,6 @@ export function useScheduledPublication(
 
   useEffect(() => {
     if (!publication?.scheduledAt) {
-      setNowMs(Date.now());
       return;
     }
 

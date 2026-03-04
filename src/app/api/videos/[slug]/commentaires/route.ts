@@ -19,14 +19,14 @@ type PublicCommentRow = {
     id: string;
     full_name: string | null;
     avatar_url: string | null;
-  } | null;
+  }[] | null;
 };
 
 type VideoAccessRow = {
   id: string;
   access_type: "public" | "members" | "paid";
   price: number;
-  allow_comments?: boolean | null;
+  allow_comments: boolean | null;
 };
 
 async function resolvePublishedVideo(slug: string) {
@@ -46,7 +46,9 @@ async function resolvePublishedVideo(slug: string) {
       .eq("status", "published")
       .is("deleted_at", null)
       .single();
-    data = fallback.data;
+    data = fallback.data
+      ? ({ ...fallback.data, allow_comments: null } as VideoAccessRow)
+      : null;
     error = fallback.error;
   }
 
@@ -301,8 +303,8 @@ export async function POST(
       }
     }
 
-    const { data, error } = await supabase
-      .from("commentaires")
+    const { data, error } = await (supabase
+      .from("commentaires") as any)
       .insert({
         user_id: user.id,
         video_id: video.id,

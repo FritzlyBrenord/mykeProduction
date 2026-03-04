@@ -89,7 +89,7 @@ async function fetchPublishedVideoBySlug(slug: string) {
       .eq("status", "published")
       .is("deleted_at", null)
       .single();
-    data = fallback.data;
+    data = (fallback.data ?? null) as typeof data;
     error = fallback.error;
   }
 
@@ -101,7 +101,7 @@ async function fetchPublishedVideoBySlug(slug: string) {
       .eq("status", "published")
       .is("deleted_at", null)
       .single();
-    data = legacy.data;
+    data = (legacy.data ?? null) as typeof data;
     error = legacy.error;
   }
 
@@ -139,7 +139,7 @@ async function fetchRelatedVideos(video: VideoRow, limit = 6) {
     }
 
     const fallback = await fallbackQuery;
-    data = fallback.data;
+    data = (fallback.data ?? null) as typeof data;
     error = fallback.error;
   }
 
@@ -158,7 +158,7 @@ async function fetchRelatedVideos(video: VideoRow, limit = 6) {
     }
 
     const legacy = await legacyQuery;
-    data = legacy.data;
+    data = (legacy.data ?? null) as typeof data;
     error = legacy.error;
   }
 

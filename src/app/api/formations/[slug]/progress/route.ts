@@ -3,10 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 
 type LessonItem = {
   id: string;
+  is_visible?: boolean | null;
 };
 
 type ModuleItem = {
   id: string;
+  is_visible?: boolean | null;
   formation_lecons?: LessonItem[] | null;
 };
 
@@ -26,16 +28,25 @@ type ProgressPayload = {
   last_accessed_at: string | null;
 };
 
+type EnrollmentRecord = {
+  id: string;
+  user_id: string;
+  formation_id: string;
+  progress: number | null;
+  completed_at: string | null;
+};
+
+type FormationForLearning = Record<string, unknown> & {
+  id: string;
+  is_free: boolean;
+  formation_modules?: ModuleItem[] | null;
+};
+
 function isVisible(value: boolean | null | undefined) {
   return value !== false;
 }
 
-function extractVisibleModules(formation: {
-  formation_modules?: (ModuleItem & {
-    is_visible?: boolean | null;
-    formation_lecons?: (LessonItem & { is_visible?: boolean | null })[] | null;
-  })[] | null;
-}) {
+function extractVisibleModules(formation: FormationForLearning) {
   return (formation.formation_modules ?? [])
     .filter((module) => isVisible(module.is_visible))
     .map((module) => ({
@@ -106,8 +117,8 @@ function computeProgress(
 }
 
 async function getFormationForLearning(supabase: Awaited<ReturnType<typeof createClient>>, slug: string) {
-  return supabase
-    .from("formations")
+  const { data, error } = await (supabase
+    .from("formations") as any)
     .select(
       `
       *,
@@ -137,6 +148,11 @@ async function getFormationForLearning(supabase: Awaited<ReturnType<typeof creat
     .eq("slug", slug)
     .eq("status", "published")
     .single();
+
+  return {
+    data: (data ?? null) as FormationForLearning | null,
+    error,
+  };
 }
 
 async function getProgressRows(
@@ -148,11 +164,16 @@ async function getProgressRows(
     return { data: [] as ProgressRow[], error: null };
   }
 
-  return supabase
-    .from("lecon_progress")
+  const { data, error } = await (supabase
+    .from("lecon_progress") as any)
     .select("lecon_id, completed, watched_at")
     .eq("user_id", userId)
     .in("lecon_id", lessonIds);
+
+  return {
+    data: (data ?? []) as ProgressRow[],
+    error,
+  };
 }
 
 export async function GET(
@@ -179,19 +200,19 @@ export async function GET(
       return NextResponse.json({ error: "Formation non trouvee" }, { status: 404 });
     }
 
-    const { data: enrollmentData, error: enrollmentError } = await supabase
-      .from("enrollments")
+    const { data: enrollmentDataRaw, error: enrollmentError } = await (supabase
+      .from("enrollments") as any)
       .select("id, user_id, formation_id, progress, completed_at")
       .eq("user_id", user.id)
       .eq("formation_id", formation.id)
       .single();
 
-    let enrollment = enrollmentData;
+    let enrollment = (enrollmentDataRaw ?? null) as EnrollmentRecord | null;
     if (!enrollment) {
       const canAutoEnroll = formation.is_free && enrollmentError?.code === "PGRST116";
       if (canAutoEnroll) {
-        const { data: createdEnrollment, error: createEnrollmentError } = await supabase
-          .from("enrollments")
+        const { data: createdEnrollmentRaw, error: createEnrollmentError } = await (supabase
+          .from("enrollments") as any)
           .upsert(
             {
               user_id: user.id,
@@ -202,6 +223,7 @@ export async function GET(
           )
           .select("id, user_id, formation_id, progress, completed_at")
           .single();
+        const createdEnrollment = (createdEnrollmentRaw ?? null) as EnrollmentRecord | null;
 
         if (createEnrollmentError || !createdEnrollment) {
           return NextResponse.json(
@@ -217,6 +239,13 @@ export async function GET(
           { status: 403 },
         );
       }
+    }
+
+    if (!enrollment) {
+      return NextResponse.json(
+        { error: "Non inscrit a cette formation" },
+        { status: 403 },
+      );
     }
 
     const visibleModules = extractVisibleModules(formation);
@@ -244,8 +273,8 @@ export async function GET(
     const progress = computeProgress(visibleModules, rows ?? []);
 
     if (Number(enrollment.progress ?? 0) !== progress.overall_progress) {
-      await supabase
-        .from("enrollments")
+      await (supabase
+        .from("enrollments") as any)
         .update({
           progress: progress.overall_progress,
           completed_at:
@@ -314,19 +343,19 @@ export async function POST(
       return NextResponse.json({ error: "Formation non trouvee" }, { status: 404 });
     }
 
-    const { data: enrollmentData, error: enrollmentError } = await supabase
-      .from("enrollments")
+    const { data: enrollmentDataRaw, error: enrollmentError } = await (supabase
+      .from("enrollments") as any)
       .select("id, user_id, formation_id, progress, completed_at")
       .eq("user_id", user.id)
       .eq("formation_id", formation.id)
       .single();
 
-    let enrollment = enrollmentData;
+    let enrollment = (enrollmentDataRaw ?? null) as EnrollmentRecord | null;
     if (!enrollment) {
       const canAutoEnroll = formation.is_free && enrollmentError?.code === "PGRST116";
       if (canAutoEnroll) {
-        const { data: createdEnrollment, error: createEnrollmentError } = await supabase
-          .from("enrollments")
+        const { data: createdEnrollmentRaw, error: createEnrollmentError } = await (supabase
+          .from("enrollments") as any)
           .upsert(
             {
               user_id: user.id,
@@ -337,6 +366,7 @@ export async function POST(
           )
           .select("id, user_id, formation_id, progress, completed_at")
           .single();
+        const createdEnrollment = (createdEnrollmentRaw ?? null) as EnrollmentRecord | null;
 
         if (createEnrollmentError || !createdEnrollment) {
           return NextResponse.json(
@@ -352,6 +382,13 @@ export async function POST(
           { status: 403 },
         );
       }
+    }
+
+    if (!enrollment) {
+      return NextResponse.json(
+        { error: "Non inscrit a cette formation" },
+        { status: 403 },
+      );
     }
 
     const visibleModules = extractVisibleModules(formation);
@@ -370,8 +407,8 @@ export async function POST(
     }
 
     if (action === "access") {
-      const { error: upsertError } = await supabase
-        .from("lecon_progress")
+      const { error: leconProgressAccessError } = await (supabase
+        .from("lecon_progress") as any)
         .upsert(
           {
             user_id: user.id,
@@ -381,15 +418,15 @@ export async function POST(
           { onConflict: "user_id,lecon_id" },
         );
 
-      if (upsertError) {
+      if (leconProgressAccessError) {
         return NextResponse.json(
-          { error: "Erreur mise a jour progression", details: upsertError.message },
+          { error: "Erreur mise a jour progression", details: leconProgressAccessError.message },
           { status: 500 },
         );
       }
     } else {
-      const { error: upsertError } = await supabase
-        .from("lecon_progress")
+      const { error: upsertError } = await (supabase
+        .from("lecon_progress") as any)
         .upsert(
           {
             user_id: user.id,
@@ -431,8 +468,8 @@ export async function POST(
         ? enrollment.completed_at ?? new Date().toISOString()
         : enrollment.completed_at;
 
-    await supabase
-      .from("enrollments")
+    await (supabase
+      .from("enrollments") as any)
       .update({
         progress: progress.overall_progress,
         completed_at: completedAt,

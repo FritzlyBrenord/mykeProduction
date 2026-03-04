@@ -355,14 +355,9 @@ export default function ModifierProduitPage() {
   }
 
   return (
-    <div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6"
-    >
+    <div className="space-y-6">
       {/* Header */}
-      <div variants={itemVariants} className="flex items-center gap-4">
+      <div className="flex items-center gap-4">
         <Link href="/admin/produits">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="w-5 h-5" />
@@ -397,7 +392,7 @@ export default function ModifierProduitPage() {
         className="grid grid-cols-1 lg:grid-cols-3 gap-8"
       >
         {/* Main Content */}
-        <div variants={itemVariants} className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {/* Basic Info */}
           <div className="bg-[var(--card)] rounded-2xl p-6 border border-[var(--border)]">
             <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
@@ -523,10 +518,7 @@ export default function ModifierProduitPage() {
 
           {/* Document Type Selection */}
           {productType === "document" && (
-            <div
-              variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
-              className="bg-[var(--card)] rounded-2xl p-6 border border-[var(--border)]"
-            >
+            <div className="bg-[var(--card)] rounded-2xl p-6 border border-[var(--border)]">
               <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
                 Type de document
               </h2>
@@ -847,7 +839,7 @@ export default function ModifierProduitPage() {
         </div>
 
         {/* Sidebar */}
-        <div variants={itemVariants} className="space-y-6">
+        <div className="space-y-6">
           {/* Pricing & Digital */}
           <div className="bg-[var(--card)] rounded-2xl p-6 border border-[var(--border)]">
             <h2 className="text-lg font-semibold mb-4">Prix</h2>

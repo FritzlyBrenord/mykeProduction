@@ -1,7 +1,7 @@
 import { env, getGmailSmtpEnv } from "@/lib/env";
 import nodemailer from "nodemailer";
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
 
 function createTransporter() {
   const { user, appPassword } = getGmailSmtpEnv();

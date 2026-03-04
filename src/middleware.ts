@@ -210,25 +210,46 @@ export async function middleware(request: NextRequest) {
     const slug = pathname.split("/")[2];
 
     if (slug) {
-      const { data: enrollment, error: enrollmentError } = await supabase
-        .from("enrollments")
-        .select(
-          `
-          *,
-          formation:formations(id, slug, status)
-        `,
-        )
-        .eq("user_id", user.id)
-        .eq("formation.slug", slug)
-        .single();
+      const { data: formation, error: formationError } = await supabase
+        .from("formations")
+        .select("id,status,is_free,deleted_at")
+        .eq("slug", slug)
+        .maybeSingle();
 
       if (
-        enrollmentError ||
-        !enrollment ||
-        !enrollment.formation ||
-        enrollment.formation.status !== "published"
+        formationError ||
+        !formation ||
+        formation.status !== "published" ||
+        formation.deleted_at
       ) {
         return NextResponse.redirect(new URL(`/formations/${slug}`, request.url));
+      }
+
+      const { data: enrollment, error: enrollmentError } = await supabase
+        .from("enrollments")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("formation_id", formation.id)
+        .maybeSingle();
+
+      if (enrollmentError && enrollmentError.code !== "PGRST116") {
+        return NextResponse.redirect(new URL(`/formations/${slug}`, request.url));
+      }
+
+      if (!enrollment && !formation.is_free) {
+        return NextResponse.redirect(new URL(`/formations/${slug}`, request.url));
+      }
+
+      // Best effort auto-enrollment for free formations to keep access and progress in sync.
+      if (!enrollment && formation.is_free) {
+        await supabase.from("enrollments").upsert(
+          {
+            user_id: user.id,
+            formation_id: formation.id,
+            progress: 0,
+          },
+          { onConflict: "user_id,formation_id" },
+        );
       }
     }
 

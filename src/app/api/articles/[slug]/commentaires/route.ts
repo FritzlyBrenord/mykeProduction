@@ -17,7 +17,7 @@ type PublicCommentRow = {
     id: string;
     full_name: string | null;
     avatar_url: string | null;
-  } | null;
+  }[] | null;
 };
 
 async function resolvePublishedArticleId(slug: string) {
@@ -226,8 +226,8 @@ export async function POST(
       }
     }
 
-    const { data, error } = await supabase
-      .from("commentaires")
+    const { data, error } = await (supabase
+      .from("commentaires") as any)
       .insert({
         user_id: user.id,
         article_id: article.id,

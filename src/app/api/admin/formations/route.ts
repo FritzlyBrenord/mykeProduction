@@ -66,12 +66,28 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '12');
+    const offset = (page - 1) * limit;
+
+    // First get total count
+    let countQuery = supabaseAdmin
+      .from('formations')
+      .select('*', { count: 'exact', head: true })
+      .is('deleted_at', null);
+
+    if (status) countQuery = countQuery.eq('status', status);
+    if (search) countQuery = countQuery.ilike('title', `%${search}%`);
+
+    const { count: totalCount, error: countError } = await countQuery;
+    if (countError) throw countError;
 
     let queryWithRelations = supabaseAdmin
       .from('formations')
       .select(FORMATION_SELECT)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (status) queryWithRelations = queryWithRelations.eq('status', status);
     if (search) queryWithRelations = queryWithRelations.ilike('title', `%${search}%`);
@@ -114,12 +130,22 @@ export async function GET(request: NextRequest) {
         formations.map((formation: any) => formation.id),
       );
 
-      return NextResponse.json(
-        formations.map((formation: any) => ({
+      const totalPages = Math.ceil((totalCount || 0) / limit);
+      
+      return NextResponse.json({
+        data: formations.map((formation: any) => ({
           ...formation,
           enrolled_count: enrollmentCounts.get(formation.id) || 0,
         })),
-      );
+        pagination: {
+          total: totalCount || 0,
+          page,
+          limit,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      });
     }
 
     console.warn('Formations relation select failed, fallback to plain select:', withRelations.error.message);
@@ -128,7 +154,8 @@ export async function GET(request: NextRequest) {
       .from('formations')
       .select('*')
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (status) fallbackQuery = fallbackQuery.eq('status', status);
     if (search) fallbackQuery = fallbackQuery.ilike('title', `%${search}%`);
@@ -144,12 +171,23 @@ export async function GET(request: NextRequest) {
     const enrollmentCounts = await getEnrollmentCountByFormationIds(
       formations.map((formation: any) => formation.id),
     );
-    return NextResponse.json(
-      formations.map((formation: any) => ({
+    
+    const totalPages = Math.ceil((totalCount || 0) / limit);
+    
+    return NextResponse.json({
+      data: formations.map((formation: any) => ({
         ...formation,
         enrolled_count: enrollmentCounts.get(formation.id) || 0,
       })),
-    );
+      pagination: {
+        total: totalCount || 0,
+        page,
+        limit,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    });
   } catch (error: any) {
     console.error('Formations fetch error:', error);
     return NextResponse.json(

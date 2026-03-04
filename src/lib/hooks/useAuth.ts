@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@/lib/types';
-import { SupabaseClient } from '@supabase/supabase-js';
 import React from 'react';
 import {
   ReactNode,
@@ -287,9 +286,10 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children, initialUser = null }: AuthProviderProps) {
+  type BrowserSupabaseClient = ReturnType<typeof createClient>;
   const [user, setUser] = useState<User | null>(initialUser);
   const [loading, setLoading] = useState(!initialUser);
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+  const [supabase, setSupabase] = useState<BrowserSupabaseClient | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
@@ -399,17 +399,33 @@ export function AuthProvider({ children, initialUser = null }: AuthProviderProps
 
         if (profile) {
           const profileWithOptionalFields = profile as {
+            id: string;
+            full_name?: string | null;
+            avatar_url?: string | null;
+            role?: 'admin' | 'client';
+            is_active?: boolean | null;
+            two_fa_enabled?: boolean | null;
+            created_at?: string | null;
             phone_encrypted?: string | null;
             country?: string | null;
             bio?: string | null;
           };
 
           setUser({
-            ...profile,
-            email: authUser.email!,
+            id: profileWithOptionalFields.id,
+            email: authUser.email ?? '',
+            full_name: profileWithOptionalFields.full_name ?? null,
+            avatar_url: profileWithOptionalFields.avatar_url ?? null,
+            role: profileWithOptionalFields.role === 'admin' ? 'admin' : 'client',
             phone: profileWithOptionalFields.phone_encrypted ?? null,
             country: profileWithOptionalFields.country ?? null,
             bio: profileWithOptionalFields.bio ?? null,
+            is_active: profileWithOptionalFields.is_active ?? true,
+            two_fa_enabled: profileWithOptionalFields.two_fa_enabled ?? false,
+            created_at:
+              profileWithOptionalFields.created_at ??
+              authUser.created_at ??
+              new Date().toISOString(),
           } as User);
           return;
         }
@@ -542,8 +558,16 @@ export function AuthProvider({ children, initialUser = null }: AuthProviderProps
         .select('is_active,deleted_at')
         .eq('id', authUser.id)
         .maybeSingle();
+      const profileStatus = (profile ?? null) as {
+        is_active?: boolean | null;
+        deleted_at?: string | null;
+      } | null;
 
-      if (!profileError && profile && (profile.is_active === false || Boolean(profile.deleted_at))) {
+      if (
+        !profileError &&
+        profileStatus &&
+        (profileStatus.is_active === false || Boolean(profileStatus.deleted_at))
+      ) {
         await supabase.auth.signOut();
         return {
           error: new Error('Compte bloque'),

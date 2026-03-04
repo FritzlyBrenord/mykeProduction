@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const supabaseAdmin = createAdminClient();
-
 /**
  * Endpoint pour réinitialiser une formation avec une date planifiée
  * Pour tester le chronomètre
@@ -14,6 +12,11 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    const supabaseAdmin = createAdminClient();
+    if (!supabaseAdmin) {
+      throw new Error("Failed to initialize admin client");
+    }
+
     const { id } = await context.params;
     const { minutes = 2, timezone = "America/Port-au-Prince" } = await request.json();
 
@@ -32,8 +35,9 @@ export async function POST(
     console.log(`[Reset] Formation ${id} - Programmée pour ${scheduledISO} (${timezone})`);
 
     // Mettre à jour la formation
-    const { error: updateError, data } = await supabaseAdmin
-      .from("formations")
+    type FormationUpdateResult = { id: string; title: string; status: string; scheduled_publish_at: string | null; scheduled_timezone: string | null };
+    const qb = supabaseAdmin.from("formations") as any;
+    const result = await (qb
       .update({
         status: "scheduled",
         scheduled_publish_at: scheduledISO,
@@ -43,9 +47,10 @@ export async function POST(
       })
       .eq("id", id)
       .select()
-      .single();
+      .single() as Promise<{ data: FormationUpdateResult | null; error: Error | null }>);
+    const { error: updateError, data } = result;
 
-    if (updateError) {
+    if (updateError || !data) {
       console.error(`[Reset] Erreur:`, updateError);
       return NextResponse.json(
         { error: "Erreur lors de la mise à jour", details: updateError },

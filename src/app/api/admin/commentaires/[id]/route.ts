@@ -3,9 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const body = await request.json();
 
         const { data, error } = await supabaseAdmin
@@ -14,7 +15,7 @@ export async function PUT(
                 status: body.status,
                 updated_at: new Date().toISOString(),
             })
-            .eq('id', params.id)
+            .eq('id', id)
             .select()
             .single();
 
@@ -24,7 +25,7 @@ export async function PUT(
         await supabaseAdmin.from('audit_logs').insert({
             action: 'update',
             table_name: 'commentaires',
-            record_id: params.id,
+            record_id: id,
             new_data: data,
         });
 
@@ -40,13 +41,14 @@ export async function PUT(
 
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const { error: deleteError } = await supabaseAdmin
             .from('commentaires')
             .delete()
-            .eq('id', params.id);
+            .eq('id', id);
 
         if (deleteError) throw deleteError;
 
@@ -54,7 +56,7 @@ export async function DELETE(
         await supabaseAdmin.from('audit_logs').insert({
             action: 'delete',
             table_name: 'commentaires',
-            record_id: params.id,
+            record_id: id,
         });
 
         return NextResponse.json({ success: true });

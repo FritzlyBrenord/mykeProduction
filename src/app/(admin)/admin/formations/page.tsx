@@ -1,17 +1,13 @@
 ﻿"use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import {
   Plus,
   Search,
-  Filter,
-  MoreHorizontal,
   Edit,
   Trash2,
   Eye,
-  EyeOff,
-  Archive,
   BookOpen,
   Video,
   Users,
@@ -19,21 +15,13 @@ import {
   TrendingUp,
   Calendar,
   Clock,
-  Award,
-  Target,
   Grid3X3,
   List,
 } from "lucide-react";
 import { useFormations, useDeleteFormation } from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
 import { Countdown } from "@/components/Countdown";
-import {
-  formatPrice,
-  formatDate,
-  getStatusColor,
-  getStatusLabel,
-  truncateText,
-} from "@/lib/utils";
+import { formatPrice, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { formatUTCDateInTimeZone } from "@/lib/timezone";
 import FormationDetail from "./components/FormationDetail";
@@ -46,27 +34,39 @@ export default function FormationsPage() {
     null,
   );
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   const params = useMemo(
     () => ({
       status: statusFilter || undefined,
       search: search || undefined,
+      page: currentPage,
+      limit: itemsPerPage,
     }),
-    [statusFilter, search],
+    [statusFilter, search, currentPage, itemsPerPage],
   );
 
   const {
-    data: formations,
+    data: response,
     isLoading,
     isError,
     error,
     refetch,
   } = useFormations(params);
 
+  const formations = response?.data || [];
+  const pagination = response?.pagination || {
+    total: 0,
+    page: 1,
+    limit: itemsPerPage,
+    totalPages: 1,
+  };
+
   const deleteMutation = useDeleteFormation();
 
   const handleDelete = async (id: string) => {
-    if (confirm("ÃŠtes-vous sÃ»r de vouloir archiver cette formation ?")) {
+    if (confirm("Êtes-vous sûr de vouloir archiver cette formation ?")) {
       deleteMutation.mutate(id);
     }
   };
@@ -111,9 +111,11 @@ export default function FormationsPage() {
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
             <div>
-              <h1 className="text-3xl font-bold text-[hsl(var(--foreground))]">Formations</h1>
+              <h1 className="text-3xl font-bold text-[hsl(var(--foreground))]">
+                Formations
+              </h1>
               <p className="text-[hsl(var(--muted-foreground))] mt-2">
-                GÃ©rez vos formations et suivez leurs performances
+                Gérez vos formations et suivez leurs performances
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -162,7 +164,7 @@ export default function FormationsPage() {
                   Total formations
                 </p>
                 <p className="text-2xl font-bold text-[hsl(var(--foreground))] mt-1">
-                  {formations?.length || 0}
+                  {pagination.total || 0}
                 </p>
               </div>
               <div className="w-12 h-12 bg-[hsl(var(--primary))/0.12] rounded-lg flex items-center justify-center">
@@ -173,7 +175,9 @@ export default function FormationsPage() {
           <div className="bg-[hsl(var(--card))] rounded-xl shadow-sm border border-[hsl(var(--border))] p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">PubliÃ©es</p>
+                <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
+                  Publiées
+                </p>
                 <p className="text-2xl font-bold text-[hsl(var(--foreground))] mt-1">
                   {formations?.filter((f: any) => f.status === "published")
                     .length || 0}
@@ -235,29 +239,38 @@ export default function FormationsPage() {
                 type="text"
                 placeholder="Rechercher une formation..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage((prev) => (prev === 1 ? prev : 1));
+                }}
                 className="w-full pl-10 pr-4 py-3 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent"
               />
             </div>
             <div className="flex gap-3">
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage((prev) => (prev === 1 ? prev : 1));
+                }}
                 className="px-4 py-3 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg text-[hsl(var(--foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent"
               >
                 <option value="">Tous les statuts</option>
                 <option value="draft">Brouillon</option>
-                <option value="published">PubliÃ©</option>
-                <option value="scheduled">PlanifiÃ©e</option>
-                <option value="archived">ArchivÃ©</option>
+                <option value="published">Publié</option>
+                <option value="scheduled">Planifiée</option>
+                <option value="archived">Archivé</option>
               </select>
               <select
                 value={formatFilter}
-                onChange={(e) => setFormatFilter(e.target.value)}
+                onChange={(e) => {
+                  setFormatFilter(e.target.value);
+                  setCurrentPage((prev) => (prev === 1 ? prev : 1));
+                }}
                 className="px-4 py-3 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg text-[hsl(var(--foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] focus:border-transparent"
               >
                 <option value="">Tous les formats</option>
-                <option value="video">VidÃ©o</option>
+                <option value="video">Vidéo</option>
                 <option value="text">Texte</option>
               </select>
             </div>
@@ -277,7 +290,7 @@ export default function FormationsPage() {
             <p className="text-sm text-red-600 mb-4">
               {(error as Error)?.message || "Erreur inconnue"}
             </p>
-            <Button onClick={() => window.location.reload()}>RÃ©essayer</Button>
+            <Button onClick={() => window.location.reload()}>Réessayer</Button>
           </div>
         ) : filteredFormations.length === 0 ? (
           <div className="text-center py-16 bg-[hsl(var(--card))] rounded-2xl border border-[hsl(var(--border))]">
@@ -286,10 +299,10 @@ export default function FormationsPage() {
               Aucune formation
             </h3>
             <p className="text-[hsl(var(--muted-foreground))] mb-6">
-              Commencez par crÃ©er votre premiÃ¨re formation
+              Commencez par créer votre première formation
             </p>
             <Link href="/admin/formations/nouvelle">
-              <Button>CrÃ©er une formation</Button>
+              <Button>Créer une formation</Button>
             </Link>
           </div>
         ) : (
@@ -310,6 +323,80 @@ export default function FormationsPage() {
                 viewMode={viewMode}
               />
             ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-between">
+            <div className="text-sm text-[hsl(var(--muted-foreground))]">
+              Affichage de {(pagination.page - 1) * pagination.limit + 1} à{" "}
+              {Math.min(pagination.page * pagination.limit, pagination.total)}{" "}
+              sur {pagination.total} formations
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(pagination.page - 1)}
+                disabled={pagination.page <= 1}
+              >
+                Précédent
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from(
+                  { length: Math.min(5, pagination.totalPages) },
+                  (_, i) => {
+                    const page = i + 1;
+                    const isActive = page === pagination.page;
+                    return (
+                      <Button
+                        key={page}
+                        variant={isActive ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className={
+                          isActive ? "bg-[hsl(var(--primary))] text-white" : ""
+                        }
+                      >
+                        {page}
+                      </Button>
+                    );
+                  },
+                )}
+                {pagination.totalPages > 5 && (
+                  <>
+                    <span className="px-2 text-[hsl(var(--muted-foreground))]">
+                      ...
+                    </span>
+                    <Button
+                      variant={
+                        pagination.page === pagination.totalPages
+                          ? "default"
+                          : "outline"
+                      }
+                      size="sm"
+                      onClick={() => setCurrentPage(pagination.totalPages)}
+                      className={
+                        pagination.page === pagination.totalPages
+                          ? "bg-[hsl(var(--primary))] text-white"
+                          : ""
+                      }
+                    >
+                      {pagination.totalPages}
+                    </Button>
+                  </>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(pagination.page + 1)}
+                disabled={pagination.page >= pagination.totalPages}
+              >
+                Suivant
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -373,7 +460,7 @@ function FormationCard({
                 {getStatusLabel(formation.status)}
               </span>
               <span className="px-2 py-1 rounded-full text-xs font-medium bg-[hsl(var(--input))] text-[hsl(var(--muted-foreground))]">
-                {formation.format === "video" ? "VidÃ©o" : "Texte"}
+                {formation.format === "video" ? "Vidéo" : "Texte"}
               </span>
             </div>
             <p className="text-sm text-[hsl(var(--muted-foreground))] mb-3 line-clamp-2">
@@ -386,7 +473,7 @@ function FormationCard({
               </span>
               <span className="flex items-center gap-1">
                 <Video className="w-4 h-4" />
-                {lessonsCount} leÃ§on{lessonsCount > 1 ? "s" : ""}
+                {lessonsCount} leçon{lessonsCount > 1 ? "s" : ""}
               </span>
               <span className="flex items-center gap-1">
                 <Users className="w-4 h-4" />
@@ -412,7 +499,7 @@ function FormationCard({
               onClick={onViewDetails}
               className="px-4 py-2 text-sm font-medium text-[hsl(var(--primary))] hover:text-[hsl(var(--primary))] hover:bg-[hsl(var(--background))] rounded-lg transition-colors"
             >
-              Voir dÃ©tails
+              Voir détails
             </button>
             <Link href={`/admin/formations/${formation.id}/modifier`}>
               <Button size="sm" variant="outline">
@@ -469,7 +556,7 @@ function FormationCard({
             ) : (
               <BookOpen className="w-3 h-3 inline mr-1" />
             )}
-            {formation.format === "video" ? "VidÃ©o" : "Texte"}
+            {formation.format === "video" ? "Vidéo" : "Texte"}
           </span>
         </div>
 
@@ -509,15 +596,23 @@ function FormationCard({
           <div className="flex items-center gap-2 p-3 bg-[hsl(var(--background))] rounded-lg">
             <BookOpen className="w-4 h-4 text-[hsl(var(--primary))]" />
             <div>
-              <div className="text-xs text-[hsl(var(--muted-foreground))]">Modules</div>
-              <div className="font-semibold text-[hsl(var(--foreground))]">{modulesCount}</div>
+              <div className="text-xs text-[hsl(var(--muted-foreground))]">
+                Modules
+              </div>
+              <div className="font-semibold text-[hsl(var(--foreground))]">
+                {modulesCount}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2 p-3 bg-[hsl(var(--background))] rounded-lg">
             <Video className="w-4 h-4 text-emerald-500" />
             <div>
-              <div className="text-xs text-[hsl(var(--muted-foreground))]">LeÃ§ons</div>
-              <div className="font-semibold text-[hsl(var(--foreground))]">{lessonsCount}</div>
+              <div className="text-xs text-[hsl(var(--muted-foreground))]">
+                Leçons
+              </div>
+              <div className="font-semibold text-[hsl(var(--foreground))]">
+                {lessonsCount}
+              </div>
             </div>
           </div>
         </div>
@@ -548,7 +643,7 @@ function FormationCard({
             <div className="flex items-center gap-2 mb-1">
               <Calendar className="w-4 h-4 text-[hsl(var(--primary))]" />
               <span className="text-xs font-semibold text-[hsl(var(--foreground))]">
-                PlanifiÃ©e
+                Planifiée
               </span>
             </div>
             <p className="text-xs text-[hsl(var(--primary))] mb-2">
@@ -572,7 +667,7 @@ function FormationCard({
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-emerald-500 rounded-full" />
               <span className="text-xs text-emerald-500">
-                PubliÃ©e le{" "}
+                Publié le{" "}
                 {new Date(formation.published_at).toLocaleString("fr-FR")}
               </span>
             </div>
@@ -592,12 +687,10 @@ function FormationCard({
             onClick={onViewDetails}
             className="px-4 py-2 bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary-dark))] text-white text-sm font-medium rounded-lg transition-colors"
           >
-            Voir dÃ©tails
+            Voir détails
           </button>
         </div>
       </div>
     </div>
   );
 }
-
-

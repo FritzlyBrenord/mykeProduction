@@ -168,37 +168,45 @@ function parseDate(value: unknown) {
 export function normalizeTrackingTimeline(value: unknown): TrackingEvent[] {
   if (!Array.isArray(value)) return [];
 
-  return value
-    .map((entry) => {
-      if (!entry || typeof entry !== 'object') return null;
-      const row = entry as Record<string, unknown>;
-      const status = typeof row.status === 'string' ? row.status : '';
-      if (!TRACKING_STATUSES.includes(status as OrderStatus) && status !== 'cancelled' && status !== 'refunded') {
-        return null;
-      }
+  const timeline: TrackingEvent[] = [];
 
-      const at = parseDate(row.at ?? row.date);
-      if (!at) return null;
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue;
+    const row = entry as Record<string, unknown>;
+    const status = typeof row.status === 'string' ? row.status : '';
+    if (
+      !TRACKING_STATUSES.includes(status as OrderStatus) &&
+      status !== 'cancelled' &&
+      status !== 'refunded'
+    ) {
+      continue;
+    }
 
-      const label =
-        typeof row.label === 'string' && row.label.trim().length > 0
-          ? row.label.trim().slice(0, 120)
-          : orderStatusLabel(status);
+    const at = parseDate(row.at ?? row.date);
+    if (!at) continue;
 
-      const note =
-        typeof row.note === 'string' && row.note.trim().length > 0
-          ? row.note.trim().slice(0, 240)
-          : undefined;
+    const label =
+      typeof row.label === 'string' && row.label.trim().length > 0
+        ? row.label.trim().slice(0, 120)
+        : orderStatusLabel(status);
 
-      return {
-        status: status as OrderStatus,
-        label,
-        at,
-        note,
-      } satisfies TrackingEvent;
-    })
-    .filter((event): event is TrackingEvent => Boolean(event))
-    .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+    const note =
+      typeof row.note === 'string' && row.note.trim().length > 0
+        ? row.note.trim().slice(0, 240)
+        : undefined;
+
+    const event: TrackingEvent = {
+      status: status as OrderStatus,
+      label,
+      at,
+    };
+    if (note) {
+      event.note = note;
+    }
+    timeline.push(event);
+  }
+
+  return timeline.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 }
 
 export function appendTrackingEvent(

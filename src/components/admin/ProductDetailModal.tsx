@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 import {
   X,
   Package,
@@ -10,10 +10,10 @@ import {
   AlertTriangle,
   ExternalLink,
   Download,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { formatPrice, cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { formatPrice, cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ProductDetailModalProps {
   product: any;
@@ -26,7 +26,10 @@ const typeIcons = {
   autre: Box,
 };
 
-export function ProductDetailModal({ product, onClose }: ProductDetailModalProps) {
+export function ProductDetailModal({
+  product,
+  onClose,
+}: ProductDetailModalProps) {
   if (!product) return null;
 
   const TypeIcon = typeIcons[product.type as keyof typeof typeIcons];
@@ -46,7 +49,9 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
               <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
                 <TypeIcon className="w-5 h-5 text-[var(--primary)]" />
               </div>
-              <h2 className="text-xl font-bold text-[var(--foreground)]">{product.name}</h2>
+              <h2 className="text-xl font-bold text-[var(--foreground)]">
+                {product.name}
+              </h2>
             </div>
             <button
               onClick={onClose}
@@ -92,15 +97,21 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-[var(--background)] rounded-xl border border-[var(--border)]">
-                    <p className="text-xs text-[var(--muted)] uppercase font-semibold mb-1">Prix</p>
-                    <p className="text-xl font-bold text-[var(--primary)]">{formatPrice(product.price)}</p>
+                    <p className="text-xs text-[var(--muted)] uppercase font-semibold mb-1">
+                      Prix
+                    </p>
+                    <p className="text-xl font-bold text-[var(--primary)]">
+                      {formatPrice(product.price)}
+                    </p>
                   </div>
                   <div className="p-4 bg-[var(--background)] rounded-xl border border-[var(--border)]">
-                    <p className="text-xs text-[var(--muted)] uppercase font-semibold mb-1">Stock</p>
+                    <p className="text-xs text-[var(--muted)] uppercase font-semibold mb-1">
+                      Stock
+                    </p>
                     <p className="text-xl font-bold text-[var(--foreground)]">
-                      {product.stock !== null ? product.stock : '∞'} 
+                      {product.stock !== null ? product.stock : "∞"}
                       <span className="text-sm font-normal text-[var(--muted)] ml-1">
-                        {product.unit || (product.is_digital ? '' : 'unités')}
+                        {product.unit || (product.is_digital ? "" : "unités")}
                       </span>
                     </p>
                   </div>
@@ -110,99 +121,142 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
               {/* Right: Details */}
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-[var(--muted)] uppercase mb-2">Description</h3>
+                  <h3 className="text-sm font-semibold text-[var(--muted)] uppercase mb-2">
+                    Description
+                  </h3>
                   <p className="text-[var(--foreground)] leading-relaxed">
-                    {product.description || 'Aucune description fournie.'}
+                    {product.description || "Aucune description fournie."}
                   </p>
                 </div>
 
                 <div className="space-y-4">
                   <div className="flex justify-between py-2 border-b border-[var(--border)]">
                     <span className="text-[var(--muted)]">Type</span>
-                    <span className="font-medium text-[var(--foreground)] capitalize">{product.type}</span>
+                    <span className="font-medium text-[var(--foreground)] capitalize">
+                      {product.type}
+                    </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-[var(--border)]">
                     <span className="text-[var(--muted)]">Slug</span>
-                    <span className="font-medium text-[var(--foreground)]">{product.slug}</span>
+                    <span className="font-medium text-[var(--foreground)]">
+                      {product.slug}
+                    </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-[var(--border)]">
                     <span className="text-[var(--muted)]">Catégorie</span>
-                    <span className="font-medium text-[var(--foreground)]">{product.category?.name || 'Sans catégorie'}</span>
+                    <span className="font-medium text-[var(--foreground)]">
+                      {product.category?.name || "Sans catégorie"}
+                    </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-[var(--border)]">
                     <span className="text-[var(--muted)]">Statut</span>
-                    <span className="font-medium text-[var(--foreground)] capitalize">{product.status}</span>
+                    <span className="font-medium text-[var(--foreground)] capitalize">
+                      {product.status}
+                    </span>
                   </div>
                   {product.is_digital && (
                     <div className="flex justify-between py-2 border-b border-[var(--border)]">
                       <span className="text-[var(--muted)]">Type produit</span>
-                      <span className="font-medium text-green-500 capitalize">Numérique</span>
+                      <span className="font-medium text-green-500 capitalize">
+                        Numérique
+                      </span>
                     </div>
                   )}
                 </div>
 
                 {/* Chemical specific */}
-                {product.type === 'chimique' && (
+                {product.type === "chimique" && (
                   <div className="p-4 bg-red-500/5 rounded-xl border border-red-500/10 space-y-3">
-                    <h4 className="text-xs font-bold text-red-500 uppercase">🧪 Informations Chimiques</h4>
+                    <h4 className="text-xs font-bold text-red-500 uppercase">
+                      🧪 Informations Chimiques
+                    </h4>
                     {product.cas_number && (
                       <div className="flex justify-between text-sm">
                         <span className="text-[var(--muted)]">N° CAS</span>
-                        <span className="font-medium text-[var(--foreground)]">{product.cas_number}</span>
+                        <span className="font-medium text-[var(--foreground)]">
+                          {product.cas_number}
+                        </span>
                       </div>
                     )}
                     {product.purity && (
                       <div className="flex justify-between text-sm">
                         <span className="text-[var(--muted)]">Pureté</span>
-                        <span className="font-medium text-[var(--foreground)]">{product.purity}</span>
+                        <span className="font-medium text-[var(--foreground)]">
+                          {product.purity}
+                        </span>
                       </div>
                     )}
                     {product.min_order && (
                       <div className="flex justify-between text-sm">
                         <span className="text-[var(--muted)]">Qty min</span>
-                        <span className="font-medium text-[var(--foreground)]">{product.min_order} {product.unit || 'unités'}</span>
+                        <span className="font-medium text-[var(--foreground)]">
+                          {product.min_order} {product.unit || "unités"}
+                        </span>
                       </div>
                     )}
                     {product.signal_word && (
                       <div className="flex justify-between text-sm">
                         <span className="text-[var(--muted)]">Mention</span>
-                        <span className={cn(
-                          'font-bold',
-                          product.signal_word === 'Danger' ? 'text-red-500' : 'text-amber-500'
-                        )}>{product.signal_word}</span>
+                        <span
+                          className={cn(
+                            "font-bold",
+                            product.signal_word === "Danger"
+                              ? "text-red-500"
+                              : "text-amber-500",
+                          )}
+                        >
+                          {product.signal_word}
+                        </span>
                       </div>
                     )}
                     {product.age_restricted && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-[var(--muted)]">Restrictions</span>
-                        <span className="font-medium text-red-500">18+ requis</span>
+                        <span className="text-[var(--muted)]">
+                          Restrictions
+                        </span>
+                        <span className="font-medium text-red-500">
+                          18+ requis
+                        </span>
                       </div>
                     )}
                     {product.restricted_sale && (
                       <div className="flex justify-between text-sm">
                         <span className="text-[var(--muted)]">Vente</span>
-                        <span className="font-medium text-amber-500">Restreinte</span>
+                        <span className="font-medium text-amber-500">
+                          Restreinte
+                        </span>
                       </div>
                     )}
-                    {product.ghs_pictograms && product.ghs_pictograms.length > 0 && (
-                      <div>
-                         <span className="text-xs text-[var(--muted)] block mb-2">Pictogrammes GHS</span>
-                         <div className="flex gap-2 flex-wrap">
+                    {product.ghs_pictograms &&
+                      product.ghs_pictograms.length > 0 && (
+                        <div>
+                          <span className="text-xs text-[var(--muted)] block mb-2">
+                            Pictogrammes GHS
+                          </span>
+                          <div className="flex gap-2 flex-wrap">
                             {product.ghs_pictograms.map((pic: string) => (
-                              <div key={pic} title={pic} className="w-8 h-8 bg-white border border-gray-200 rounded p-1 flex items-center justify-center">
-                                <span className="text-[10px] font-bold text-gray-900">{pic}</span>
+                              <div
+                                key={pic}
+                                title={pic}
+                                className="w-8 h-8 bg-white border border-gray-200 rounded p-1 flex items-center justify-center"
+                              >
+                                <span className="text-[10px] font-bold text-gray-900">
+                                  {pic}
+                                </span>
                               </div>
                             ))}
-                         </div>
-                      </div>
-                    )}
+                          </div>
+                        </div>
+                      )}
                   </div>
                 )}
 
                 {/* Document specific */}
-                {product.type === 'document' && (
+                {product.type === "document" && (
                   <div className="p-4 bg-blue-500/5 rounded-xl border border-blue-500/10">
-                    <h4 className="text-xs font-bold text-blue-500 uppercase mb-3">📄 Fichier numérique</h4>
+                    <h4 className="text-xs font-bold text-blue-500 uppercase mb-3">
+                      📄 Fichier numérique
+                    </h4>
                     {product.file_url ? (
                       <a
                         href={product.file_url}
@@ -216,7 +270,10 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
                     ) : (
                       <div className="text-sm text-[var(--muted)] bg-[var(--background)] rounded-lg p-3">
                         <p>❌ Aucun document uploadé</p>
-                        <p className="text-xs mt-2">Cliquez sur "Modifier le produit" pour ajouter le document.</p>
+                        <p className="text-xs mt-2">
+                          Cliquez sur "Modifier le produit" pour ajouter le
+                          document.
+                        </p>
                       </div>
                     )}
                   </div>
@@ -227,10 +284,12 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
             {/* Content (Rich Text) */}
             {product.content && (
               <div className="mt-8 pt-8 border-t border-[var(--border)]">
-                <h3 className="text-sm font-semibold text-[var(--muted)] uppercase mb-4">Détails techniques</h3>
-                <div 
-                   className="article-content"
-                   dangerouslySetInnerHTML={{ __html: product.content }} 
+                <h3 className="text-sm font-semibold text-[var(--muted)] uppercase mb-4">
+                  Détails techniques
+                </h3>
+                <div
+                  className="article-content"
+                  dangerouslySetInnerHTML={{ __html: product.content }}
                 />
               </div>
             )}
@@ -238,7 +297,9 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
 
           {/* Footer */}
           <div className="p-6 border-t border-[var(--border)] bg-[var(--background)] flex justify-end gap-3">
-            <Button variant="outline" onClick={onClose}>Fermer</Button>
+            <Button variant="outline" onClick={onClose}>
+              Fermer
+            </Button>
             <Button className="flex gap-2">
               <Edit className="w-4 h-4" />
               Modifier le produit
@@ -251,19 +312,19 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
 }
 
 const Edit = ({ className }: { className?: string }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="24" 
-    height="24" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
     className={className}
   >
-    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-    <path d="m15 5 4 4"/>
+    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    <path d="m15 5 4 4" />
   </svg>
 );

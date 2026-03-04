@@ -8,7 +8,7 @@ type RevenueOrderRow = {
   status: string;
   total_amount: number | null;
   created_at: string;
-  user?: { full_name: string | null } | null;
+  user?: { full_name: string | null }[] | null;
 };
 
 function toNumber(value: unknown) {
@@ -163,7 +163,7 @@ export async function GET() {
       amount: toNumber(row.total_amount),
       created_at: row.created_at,
       user: {
-        full_name: safeFullName(row.user?.full_name),
+        full_name: safeFullName(row.user?.[0]?.full_name),
       },
     }));
 

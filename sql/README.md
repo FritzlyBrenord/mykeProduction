@@ -1,6 +1,6 @@
 # SQL
 
-Les migrations doivent etre executees dans l'ordre numerique (`001` -> `016`).
+Les migrations doivent etre executees dans l'ordre numerique (`001` -> `017`).
 
 - `001_myke_industrie_v3.sql`: schema de base (tables, trigger/function, contraintes).
 - `002_rls_phase0.sql`: couverture RLS Phase 0 (activation RLS + policies sur tables core).
@@ -13,3 +13,4 @@ Les migrations doivent etre executees dans l'ordre numerique (`001` -> `016`).
 - `014_order_items_split_workflow.sql`: workflow separe par item de commande (formation vs produit).
 - `015_video_social_features.sql`: likes/commentaires/vues uniques pour les videos.
 - `016_visitor_sessions.sql`: tracking global des visiteurs anonymes (admin analytics).
+- `017_videos_bucket_large_uploads.sql`: augmente la limite de taille et MIME du bucket `videos`.

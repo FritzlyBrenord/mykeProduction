@@ -82,6 +82,7 @@ export async function GET() {
       items?: Array<{
         item_type: 'produit' | 'formation' | 'video';
         formation_id: string | null;
+        item_status?: string | null;
         authorized_at?: string | null;
       }>;
     }>;
@@ -161,8 +162,8 @@ export async function GET() {
       payment: paymentByOrder.get(order.id) ?? null,
       tracking_timeline: buildTrackingTimelineFromOrder(order),
       items: (order.items ?? []).map((item) => {
-        const itemStatus = typeof (item as { item_status?: unknown }).item_status === 'string'
-          ? (item as { item_status: string }).item_status
+        const itemStatus = typeof item.item_status === 'string' && item.item_status.length > 0
+          ? item.item_status
           : 'paid';
         if (item.item_type !== 'formation' || !item.formation_id) {
           return {

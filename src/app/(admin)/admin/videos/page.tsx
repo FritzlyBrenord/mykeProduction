@@ -186,7 +186,9 @@ export default function VideosPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [showStatusMenu, setShowStatusMenu] = useState<string | null>(null);
   const [engagementOpen, setEngagementOpen] = useState(false);
-  const [engagementVideoId, setEngagementVideoId] = useState<string | null>(null);
+  const [engagementVideoId, setEngagementVideoId] = useState<string | null>(
+    null,
+  );
   const [engagementStatusFilter, setEngagementStatusFilter] =
     useState<EngagementStatus>("all");
   const [engagementPage, setEngagementPage] = useState(1);
@@ -320,13 +322,17 @@ export default function VideosPage() {
 
         const payload = await response.json();
         if (!response.ok) {
-          throw new Error(payload?.error || "Impossible de charger l'engagement.");
+          throw new Error(
+            payload?.error || "Impossible de charger l'engagement.",
+          );
         }
 
         setEngagementData(payload as AdminVideoEngagementPayload);
       } catch (err) {
         const message =
-          err instanceof Error ? err.message : "Impossible de charger l'engagement.";
+          err instanceof Error
+            ? err.message
+            : "Impossible de charger l'engagement.";
         setEngagementError(message);
       } finally {
         if (silent) {
@@ -342,23 +348,21 @@ export default function VideosPage() {
   useEffect(() => {
     if (!engagementOpen || !engagementVideoId) return;
     void fetchEngagement(false);
-  }, [engagementOpen, engagementVideoId, engagementPage, engagementStatusFilter, fetchEngagement]);
+  }, [
+    engagementOpen,
+    engagementVideoId,
+    engagementPage,
+    engagementStatusFilter,
+    fetchEngagement,
+  ]);
 
   const engagementSelectedVideo =
     videos.find((video) => video.id === engagementVideoId) || null;
 
   return (
-    <div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6"
-    >
+    <div className="space-y-6">
       {/* Header */}
-      <div
-        variants={itemVariants}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
-      >
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-[var(--foreground)]">
             Vidéos
@@ -373,10 +377,7 @@ export default function VideosPage() {
 
       {/* Error Alert */}
       {error && (
-        <div
-          variants={itemVariants}
-          className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex gap-3"
-        >
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex gap-3">
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-medium text-red-500">Erreur</p>
@@ -386,10 +387,7 @@ export default function VideosPage() {
       )}
 
       {/* Stats */}
-      <div
-        variants={itemVariants}
-        className="grid grid-cols-2 md:grid-cols-6 gap-4"
-      >
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
           <p className="text-sm text-[var(--muted)]">Total vidéos</p>
           <p className="text-2xl font-bold text-[var(--foreground)]">
@@ -421,7 +419,7 @@ export default function VideosPage() {
       </div>
 
       {/* Filters */}
-      <div variants={itemVariants} className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" />
           <input
@@ -456,10 +454,7 @@ export default function VideosPage() {
 
       {/* Loading State */}
       {loading && videos.length === 0 && (
-        <div
-          variants={itemVariants}
-          className="flex items-center justify-center py-16"
-        >
+        <div className="flex items-center justify-center py-16">
           <div className="text-center">
             <div className="inline-flex p-4 bg-[var(--primary)]/10 rounded-full mb-4">
               <Loader className="w-8 h-8 text-[var(--primary)] animate-spin" />
@@ -476,10 +471,7 @@ export default function VideosPage() {
 
       {/* Error State */}
       {error && (
-        <div
-          variants={itemVariants}
-          className="bg-red-500/10 border border-red-500/30 rounded-xl p-6"
-        >
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
           <div className="flex gap-4">
             <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
             <div>
@@ -500,10 +492,7 @@ export default function VideosPage() {
 
       {/* Empty State */}
       {!loading && !error && videos.length === 0 && (
-        <div
-          variants={itemVariants}
-          className="flex items-center justify-center py-16"
-        >
+        <div className="flex items-center justify-center py-16">
           <div className="text-center max-w-sm">
             <div className="inline-flex p-4 bg-[var(--primary)]/10 rounded-full mb-4">
               <Video className="w-8 h-8 text-[var(--primary)]" />
@@ -528,10 +517,7 @@ export default function VideosPage() {
         !error &&
         videos.length > 0 &&
         filteredVideos.length === 0 && (
-          <div
-            variants={itemVariants}
-            className="flex items-center justify-center py-16"
-          >
+          <div className="flex items-center justify-center py-16">
             <div className="text-center max-w-sm">
               <div className="inline-flex p-4 bg-[var(--muted)]/10 rounded-full mb-4">
                 <Search className="w-8 h-8 text-[var(--muted)]" />
@@ -550,10 +536,7 @@ export default function VideosPage() {
       {/* Videos Grid */}
       {!loading && filteredVideos.length > 0 && (
         <>
-          <div
-            variants={itemVariants}
-            className="flex items-center justify-between"
-          >
+          <div className="flex items-center justify-between">
             <p className="text-sm text-[var(--muted)]">
               {filteredVideos.length} vidéo
               {filteredVideos.length > 1 ? "s" : ""} trouvée
@@ -561,10 +544,7 @@ export default function VideosPage() {
             </p>
           </div>
 
-          <div
-            variants={itemVariants}
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-          >
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredVideos.map((video) => {
               const accessConfig =
                 accessTypeConfig[
@@ -595,7 +575,6 @@ export default function VideosPage() {
               return (
                 <div
                   key={video.id}
-                  variants={itemVariants}
                   className="bg-[var(--card)] rounded-xl border border-[var(--border)] overflow-hidden group hover:shadow-2xl hover:shadow-[var(--primary)]/5 transition-all duration-500"
                 >
                   {/* Video Container Premium */}
@@ -715,12 +694,7 @@ export default function VideosPage() {
                         </button>
 
                         {showStatusMenu === video.id && (
-                          <div
-                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                            className="absolute right-0 mt-2 w-40 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 overflow-hidden"
-                          >
+                          <div className="absolute right-0 mt-2 w-40 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 overflow-hidden">
                             <div className="p-1.5 space-y-0.5">
                               <button
                                 onClick={() =>
@@ -1072,8 +1046,8 @@ export default function VideosPage() {
 
                     {!engagementData.data.comments_feature_available ? (
                       <p className="text-sm text-[var(--muted)] mt-3">
-                        Les commentaires video ne sont pas disponibles dans votre
-                        base SQL.
+                        Les commentaires video ne sont pas disponibles dans
+                        votre base SQL.
                       </p>
                     ) : engagementData.data.comments.length === 0 ? (
                       <p className="text-sm text-[var(--muted)] mt-3">
@@ -1151,7 +1125,9 @@ export default function VideosPage() {
                           size="sm"
                           disabled={engagementPage <= 1}
                           onClick={() =>
-                            setEngagementPage((current) => Math.max(1, current - 1))
+                            setEngagementPage((current) =>
+                              Math.max(1, current - 1),
+                            )
                           }
                           className="border-[var(--border)]"
                         >
@@ -1165,10 +1141,15 @@ export default function VideosPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled={engagementPage >= engagementData.meta.totalPages}
+                          disabled={
+                            engagementPage >= engagementData.meta.totalPages
+                          }
                           onClick={() =>
                             setEngagementPage((current) =>
-                              Math.min(engagementData.meta.totalPages, current + 1),
+                              Math.min(
+                                engagementData.meta.totalPages,
+                                current + 1,
+                              ),
                             )
                           }
                           className="border-[var(--border)]"
@@ -1187,6 +1168,7 @@ export default function VideosPage() {
 
       {/* Modals */}
       <VideoFormModal
+        key={`${selectedVideo?.id ?? "new"}-${isFormOpen ? "open" : "closed"}`}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSubmit={handleFormSubmit}

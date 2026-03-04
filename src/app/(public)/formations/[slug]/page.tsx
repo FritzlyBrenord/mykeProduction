@@ -160,7 +160,8 @@ export default function FormationDetailPage() {
   };
 
   const handleFreeAccess = () => {
-    router.push(`/formations/${formation?.slug}/apprendre`);
+    if (!formation?.slug) return;
+    router.push(`/formations/${formation.slug}/apprendre`);
   };
 
   if (isLoading) {

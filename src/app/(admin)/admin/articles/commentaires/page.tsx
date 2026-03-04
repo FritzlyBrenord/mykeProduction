@@ -238,7 +238,7 @@ export default function CommentairesPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-4 text-sm text-[var(--muted)] max-w-[200px] truncate" title={commentaire.article?.title}>
+                    <td className="py-4 px-4 text-sm text-[var(--muted)] max-w-[200px] truncate" title={commentaire.article?.title ?? undefined}>
                       {commentaire.article?.title || '-'}
                     </td>
                     <td className="py-4 px-4">

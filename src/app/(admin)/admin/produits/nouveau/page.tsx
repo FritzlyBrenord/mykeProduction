@@ -243,11 +243,11 @@ export default function NouveauProduitPage() {
 
         const data = await res.json();
         documentUrl = data.urls?.[0] || "";
-        
+
         console.log("✅ Document uploadé:", {
           fileName: documentFile.name,
           url: documentUrl,
-          response: data
+          response: data,
         });
       }
 
@@ -271,7 +271,7 @@ export default function NouveauProduitPage() {
         name: submissionData.name,
         type: submissionData.type,
         file_url: submissionData.file_url,
-        is_digital: submissionData.is_digital
+        is_digital: submissionData.is_digital,
       });
 
       createMutation.mutate(submissionData, {
@@ -290,14 +290,9 @@ export default function NouveauProduitPage() {
   };
 
   return (
-    <div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6"
-    >
+    <div className="space-y-6">
       {/* Header */}
-      <div variants={itemVariants} className="flex items-center gap-4">
+      <div className="flex items-center gap-4">
         <Link href="/admin/produits">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="w-5 h-5" />
@@ -328,10 +323,7 @@ export default function NouveauProduitPage() {
       </div>
 
       {/* Product Type Selection */}
-      <div
-        variants={itemVariants}
-        className="bg-[var(--card)] rounded-2xl p-6 border border-[var(--border)]"
-      >
+      <div className="bg-[var(--card)] rounded-2xl p-6 border border-[var(--border)]">
         <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
           Type de produit
         </h2>
@@ -384,10 +376,7 @@ export default function NouveauProduitPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Document Type Selection - MOVED INSIDE FORM */}
           {productType === "document" && (
-            <div
-              variants={itemVariants}
-              className="bg-blue-500/10 border border-blue-500 rounded-2xl p-6"
-            >
+            <div className="bg-blue-500/10 border border-blue-500 rounded-2xl p-6">
               <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
                 📄 Type de document
               </h2>
@@ -443,10 +432,7 @@ export default function NouveauProduitPage() {
 
           {/* Electronic Document Upload - IMMEDIATELY VISIBLE */}
           {productType === "document" && isElectronicDocument && (
-            <div
-              variants={itemVariants}
-              className="bg-green-500/10 border border-green-500 rounded-2xl p-6"
-            >
+            <div className="bg-green-500/10 border border-green-500 rounded-2xl p-6">
               <h2 className="text-lg font-semibold text-green-600 mb-4">
                 ⬇️ Télécharger le document
               </h2>
@@ -795,7 +781,7 @@ export default function NouveauProduitPage() {
         </div>
 
         {/* Sidebar */}
-        <div variants={itemVariants} className="space-y-6">
+        <div className="space-y-6">
           {/* Pricing */}
           <div className="bg-[var(--card)] rounded-2xl p-6 border border-[var(--border)]">
             <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">

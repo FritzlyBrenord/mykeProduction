@@ -147,6 +147,7 @@ export interface Database {
           intro_video_url: string | null;
           intro_video_type: 'upload' | 'youtube' | 'vimeo' | null;
           order_index: number;
+          is_visible: boolean;
           created_at: string;
         };
         Insert: {
@@ -159,6 +160,7 @@ export interface Database {
           intro_video_url?: string | null;
           intro_video_type?: 'upload' | 'youtube' | 'vimeo' | null;
           order_index: number;
+          is_visible?: boolean;
           created_at?: string;
         };
         Update: {
@@ -171,6 +173,7 @@ export interface Database {
           intro_video_url?: string | null;
           intro_video_type?: 'upload' | 'youtube' | 'vimeo' | null;
           order_index?: number;
+          is_visible?: boolean;
           created_at?: string;
         };
       };
@@ -185,6 +188,7 @@ export interface Database {
           duration_min: number | null;
           order_index: number;
           is_preview: boolean;
+          is_visible: boolean;
           created_at: string;
         };
         Insert: {
@@ -197,6 +201,7 @@ export interface Database {
           duration_min?: number | null;
           order_index: number;
           is_preview?: boolean;
+          is_visible?: boolean;
           created_at?: string;
         };
         Update: {
@@ -209,6 +214,7 @@ export interface Database {
           duration_min?: number | null;
           order_index?: number;
           is_preview?: boolean;
+          is_visible?: boolean;
           created_at?: string;
         };
       };

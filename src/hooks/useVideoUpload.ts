@@ -30,35 +30,47 @@ export function useVideoUpload(): UseVideoUploadResult {
         throw new Error('Only video files are allowed');
       }
 
-      const maxSize = 500 * 1024 * 1024; // 500MB
-      if (file.size > maxSize) {
-        throw new Error('Video exceeds 500MB limit');
+      const initResponse = await fetch('/api/admin/videos/upload-video/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+        }),
+      });
+      const initPayload = (await initResponse
+        .json()
+        .catch(() => null)) as { signedUrl?: string; url?: string; error?: string } | null;
+      if (!initResponse.ok || !initPayload?.signedUrl || !initPayload.url) {
+        throw new Error(initPayload?.error || 'Unable to initialize upload');
       }
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('folder', 'videos');
-
-      const xhr = new XMLHttpRequest();
-
-      // Track upload progress
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          setProgress({ loaded: e.loaded, total: e.total });
-        }
-      });
-
       return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            setProgress({ loaded: e.loaded, total: e.total });
+          }
+        });
+
         xhr.addEventListener('load', () => {
-          if (xhr.status === 200) {
-            const response = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300) {
             setProgress({ loaded: file.size, total: file.size });
             setTimeout(() => setProgress(null), 500);
-            // API retourne { urls: [...] }
-            resolve(response.urls[0]);
+            resolve(initPayload.url as string);
           } else {
-            const response = JSON.parse(xhr.responseText);
-            reject(new Error(response.error || 'Upload failed'));
+            let uploadError = 'Upload failed';
+            try {
+              const body = JSON.parse(xhr.responseText || '{}') as { error?: string; message?: string };
+              uploadError = body.error || body.message || uploadError;
+            } catch {
+              if (xhr.responseText) {
+                uploadError = xhr.responseText;
+              }
+            }
+            reject(new Error(uploadError));
           }
         });
 
@@ -66,8 +78,9 @@ export function useVideoUpload(): UseVideoUploadResult {
           reject(new Error('Upload error'));
         });
 
-        xhr.open('POST', '/api/admin/upload');
-        xhr.send(formData);
+        xhr.open('PUT', initPayload.signedUrl as string);
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+        xhr.send(file);
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Upload failed';

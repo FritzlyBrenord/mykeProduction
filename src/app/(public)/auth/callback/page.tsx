@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
+type ProfileGateRow = {
+  role: "admin" | "client" | null;
+  is_active: boolean | null;
+  deleted_at: string | null;
+};
+
 const TRANSIENT_OAUTH_COOKIE_PATTERNS = [
   "supabase-auth-code-verifier",
   "sb-auth-code-verifier",
@@ -38,6 +44,7 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       const supabase = createClient();
+      const profiles = () => supabase.from("profiles" as any) as any;
 
       try {
         const url = new URL(window.location.href);
@@ -96,7 +103,7 @@ export default function AuthCallback() {
           user.user_metadata?.avatar_url || user.user_metadata?.picture || null;
 
         // Best-effort profile sync: do not block login if this fails.
-        const { error: profileError } = await supabase.from("profiles").upsert(
+        const { error: profileError } = await profiles().upsert(
           {
             id: user.id,
             full_name: fullName,
@@ -109,8 +116,7 @@ export default function AuthCallback() {
           console.error("Profile sync warning after Google OAuth:", profileError);
         }
 
-        const { error: loginUpdateError } = await supabase
-          .from("profiles")
+        const { error: loginUpdateError } = await profiles()
           .update({ last_login_at: new Date().toISOString() })
           .eq("id", user.id);
 
@@ -118,11 +124,10 @@ export default function AuthCallback() {
           console.error("Unable to update last_login_at:", loginUpdateError);
         }
 
-        const { data: profile } = await supabase
-          .from("profiles")
+        const { data: profile } = (await profiles()
           .select("role,is_active,deleted_at")
           .eq("id", user.id)
-          .maybeSingle();
+          .maybeSingle()) as { data: ProfileGateRow | null };
 
         if (profile && (profile.is_active === false || Boolean(profile.deleted_at))) {
           await supabase.auth.signOut();

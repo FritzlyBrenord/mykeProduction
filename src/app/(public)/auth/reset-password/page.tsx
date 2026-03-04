@@ -566,7 +566,7 @@ export default function ResetPasswordPage() {
 
               <Button
                 type="submit"
-                disabled={isSubmittingPassword || mode === "done"}
+                disabled={isSubmittingPassword}
                 className="w-full h-12 bg-slate-900 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 text-base font-medium disabled:opacity-60"
               >
                 {isSubmittingPassword ? (

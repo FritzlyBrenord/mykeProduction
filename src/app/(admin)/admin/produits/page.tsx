@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { useState } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   Plus,
   Search,
@@ -15,14 +15,14 @@ import {
   AlertTriangle,
   Eye,
   Loader2,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { formatPrice, getStatusColor, getStatusLabel } from '@/lib/utils';
-import { cn } from '@/lib/utils';
-import { getPrimaryProductImage, normalizeProductType } from '@/lib/products';
-import { useProduits, useDeleteProduit } from '@/hooks/useAdmin';
-import { ProductDetailModal } from '@/components/admin/ProductDetailModal';
-import { Produit } from '@/lib/types';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { formatPrice, getStatusColor, getStatusLabel } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { getPrimaryProductImage, normalizeProductType } from "@/lib/products";
+import { useProduits, useDeleteProduit } from "@/hooks/useAdmin";
+import { ProductDetailModal } from "@/components/admin/ProductDetailModal";
+import { Produit } from "@/lib/types";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -41,53 +41,57 @@ const typeIcons = {
 };
 
 const typeColors = {
-  chimique: 'bg-red-500/10 text-red-500 border-red-500/20',
-  document: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-  autre: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+  chimique: "bg-red-500/10 text-red-500 border-red-500/20",
+  document: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  autre: "bg-gray-500/10 text-gray-500 border-gray-500/20",
 };
 
 export default function ProduitsPage() {
-  const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [selectedProduct, setSelectedProduct] = useState<Produit | null>(null);
-  
-  const { data: produits = [], isLoading, isError, error } = useProduits({ 
-    type: typeFilter || undefined, 
-    status: statusFilter || undefined 
+
+  const {
+    data: produits = [],
+    isLoading,
+    isError,
+    error,
+  } = useProduits({
+    type: typeFilter || undefined,
+    status: statusFilter || undefined,
   });
   const produitsList = (produits ?? []) as Produit[];
-  
+
   const deleteProduit = useDeleteProduit();
 
   const filteredProduits = produitsList.filter((produit) => {
-    const productName = String(produit?.name ?? '').toLowerCase();
+    const productName = String(produit?.name ?? "").toLowerCase();
     if (search && !productName.includes(search.toLowerCase())) return false;
     return true;
   });
 
   const lowStockCount = produitsList.filter(
-    (p) => p.type === 'chimique' && p.stock !== null && p.stock < 50
+    (p) => p.type === "chimique" && p.stock !== null && p.stock < 50,
   ).length;
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
+    if (window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")) {
       await deleteProduit.mutateAsync(id);
     }
   };
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6"
-    >
+    <div className="space-y-6">
       {/* Header */}
-      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[var(--foreground)]">Produits</h1>
-          <p className="text-[var(--muted)] mt-1">Gérez votre catalogue de produits</p>
+          <h1 className="text-3xl font-bold text-[var(--foreground)]">
+            Produits
+          </h1>
+          <p className="text-[var(--muted)] mt-1">
+            Gérez votre catalogue de produits
+          </p>
         </div>
         <Link href="/admin/produits/nouveau">
           <Button className="gap-2">
@@ -95,11 +99,11 @@ export default function ProduitsPage() {
             Nouveau produit
           </Button>
         </Link>
-      </motion.div>
+      </div>
 
       {/* Alerts */}
       {lowStockCount > 0 && (
-        <motion.div variants={itemVariants} className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center gap-3">
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-500" />
           <div>
             <p className="text-sm font-medium text-amber-600">
@@ -109,19 +113,21 @@ export default function ProduitsPage() {
               Pensez à réapprovisionner votre inventaire
             </p>
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Stats */}
-      <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
           <p className="text-sm text-[var(--muted)]">Total produits</p>
-          <p className="text-2xl font-bold text-[var(--foreground)]">{produitsList.length}</p>
+          <p className="text-2xl font-bold text-[var(--foreground)]">
+            {produitsList.length}
+          </p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
           <p className="text-sm text-[var(--muted)]">Chimiques</p>
           <p className="text-2xl font-bold text-red-500">
-            {produitsList.filter((p) => p.type === 'chimique').length}
+            {produitsList.filter((p) => p.type === "chimique").length}
           </p>
         </div>
         <div className="bg-[var(--card)] rounded-xl p-4 border border-[var(--border)]">
@@ -134,10 +140,10 @@ export default function ProduitsPage() {
           <p className="text-sm text-[var(--muted)]">Stock faible</p>
           <p className="text-2xl font-bold text-amber-500">{lowStockCount}</p>
         </div>
-      </motion.div>
+      </div>
 
       {/* Filters */}
-      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" />
           <input
@@ -170,7 +176,7 @@ export default function ProduitsPage() {
             <option value="archived">Archivé</option>
           </select>
         </div>
-      </motion.div>
+      </div>
 
       {/* Products Grid */}
       {isLoading ? (
@@ -182,7 +188,8 @@ export default function ProduitsPage() {
         <div className="text-center py-20 bg-red-500/10 rounded-2xl border border-red-500/30">
           <p className="text-red-600 font-medium">Erreur API produits</p>
           <p className="text-sm text-red-500 mt-2">
-            {(error as Error)?.message || 'Impossible de recuperer les produits.'}
+            {(error as Error)?.message ||
+              "Impossible de recuperer les produits."}
           </p>
         </div>
       ) : filteredProduits.length === 0 ? (
@@ -190,12 +197,12 @@ export default function ProduitsPage() {
           <p className="text-[var(--muted)]">Aucun produit trouvé</p>
         </div>
       ) : (
-        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredProduits.map((produit) => {
             const normalizedType = normalizeProductType(produit?.type);
             const TypeIcon = typeIcons[normalizedType] ?? Box;
             const primaryImage = getPrimaryProductImage(produit?.images);
-            
+
             return (
               <div
                 key={produit.id}
@@ -214,10 +221,15 @@ export default function ProduitsPage() {
                       <TypeIcon className="w-16 h-16 text-[var(--primary)]/30" />
                     </div>
                   )}
-                  
+
                   {/* Badges */}
                   <div className="absolute top-3 left-3 flex flex-wrap gap-2">
-                    <span className={cn('px-2 py-1 rounded-full text-xs font-medium border uppercase', typeColors[normalizedType])}>
+                    <span
+                      className={cn(
+                        "px-2 py-1 rounded-full text-xs font-medium border uppercase",
+                        typeColors[normalizedType],
+                      )}
+                    >
                       {normalizedType}
                     </span>
                     {produit.featured && (
@@ -226,7 +238,7 @@ export default function ProduitsPage() {
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Actions */}
                   <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
@@ -240,7 +252,7 @@ export default function ProduitsPage() {
                         <Edit className="w-4 h-4 text-gray-900" />
                       </button>
                     </Link>
-                    <button 
+                    <button
                       onClick={() => handleDelete(produit.id)}
                       disabled={deleteProduit.isPending}
                       className="p-2 bg-red-500 rounded-lg hover:bg-red-600 transition-colors shadow-sm disabled:opacity-50"
@@ -248,52 +260,74 @@ export default function ProduitsPage() {
                       <Trash2 className="w-4 h-4 text-white" />
                     </button>
                   </div>
-                  
+
                   {/* Status */}
                   <div className="absolute bottom-3 left-3">
-                    <span className={cn('px-2 py-1 rounded-full text-xs font-medium border', getStatusColor(produit.status))}>
+                    <span
+                      className={cn(
+                        "px-2 py-1 rounded-full text-xs font-medium border",
+                        getStatusColor(produit.status),
+                      )}
+                    >
                       {getStatusLabel(produit.status)}
                     </span>
                   </div>
                 </div>
-                
+
                 {/* Content */}
                 <div className="p-5">
-                  <h3 className="font-semibold text-[var(--foreground)] mb-2 line-clamp-1">{produit.name}</h3>
-                  
+                  <h3 className="font-semibold text-[var(--foreground)] mb-2 line-clamp-1">
+                    {produit.name}
+                  </h3>
+
                   {/* Chemical specific info */}
-                  {normalizedType === 'chimique' && (
+                  {normalizedType === "chimique" && (
                     <div className="space-y-1 mb-3">
                       {produit.cas_number && (
-                        <p className="text-xs text-[var(--muted)]">CAS: {produit.cas_number}</p>
+                        <p className="text-xs text-[var(--muted)]">
+                          CAS: {produit.cas_number}
+                        </p>
                       )}
                       {produit.signal_word && (
-                        <p className={cn(
-                          'text-xs font-medium',
-                          produit.signal_word === 'Danger' ? 'text-red-500' : 'text-amber-500'
-                        )}>
+                        <p
+                          className={cn(
+                            "text-xs font-medium",
+                            produit.signal_word === "Danger"
+                              ? "text-red-500"
+                              : "text-amber-500",
+                          )}
+                        >
                           {produit.signal_word}
                         </p>
                       )}
                     </div>
                   )}
-                  
+
                   {/* Stock */}
                   <div className="flex items-center gap-2 mb-4">
                     <Package className="w-4 h-4 text-[var(--muted)]" />
                     <span className="text-sm text-[var(--muted)]">
                       {produit.stock !== null ? (
                         <>
-                          Stock: <span className={produit.stock < 50 ? 'text-amber-500 font-medium' : 'text-[var(--foreground)]'}>
-                            {produit.stock} {produit.unit || 'unités'}
+                          Stock:{" "}
+                          <span
+                            className={
+                              produit.stock < 50
+                                ? "text-amber-500 font-medium"
+                                : "text-[var(--foreground)]"
+                            }
+                          >
+                            {produit.stock} {produit.unit || "unités"}
                           </span>
                         </>
                       ) : (
-                        <span className="text-green-500">Illimité (numérique)</span>
+                        <span className="text-green-500">
+                          Illimité (numérique)
+                        </span>
                       )}
                     </span>
                   </div>
-                  
+
                   {/* Footer */}
                   <div className="flex items-center justify-between pt-4 border-t border-[var(--border)]">
                     <span className="text-xl font-bold text-[var(--foreground)]">
@@ -309,7 +343,7 @@ export default function ProduitsPage() {
               </div>
             );
           })}
-        </motion.div>
+        </div>
       )}
 
       {/* Detail Modal */}
@@ -317,6 +351,6 @@ export default function ProduitsPage() {
         product={selectedProduct}
         onClose={() => setSelectedProduct(null)}
       />
-    </motion.div>
+    </div>
   );
 }

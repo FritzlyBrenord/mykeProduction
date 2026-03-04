@@ -33,6 +33,12 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Service unavailable" },
+      { status: 500 },
+    );
+  }
   const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
 
   if (deleteError) {

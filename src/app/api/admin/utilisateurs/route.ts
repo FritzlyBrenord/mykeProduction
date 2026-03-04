@@ -372,6 +372,9 @@ export async function GET(request: NextRequest) {
     if (usersError) throw usersError;
 
     const adminClient = createAdminClient();
+    if (!adminClient) {
+      throw new Error("Failed to initialize admin client");
+    }
     const usersWithEmails = await Promise.all(
       (
         (usersRows || []) as Array<{
@@ -518,6 +521,9 @@ export async function POST(request: NextRequest) {
     }
 
     const adminClient = createAdminClient();
+    if (!adminClient) {
+      throw new Error("Failed to initialize admin client");
+    }
     const { data: createdAuthUser, error: createUserError } =
       await adminClient.auth.admin.createUser({
         email,
@@ -603,16 +609,79 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const body = (await request.json()) as { ids?: string[] };
+    const body = (await request.json()) as { ids?: string[]; target?: "users" | "visitors" };
     const ids = Array.isArray(body.ids)
       ? body.ids
           .map((value) => value?.trim())
           .filter((value): value is string => Boolean(value))
-          .slice(0, 200)
+          .slice(0, 500)
       : [];
+    const target = body.target === "visitors" ? "visitors" : "users";
 
     if (ids.length === 0) {
-      return NextResponse.json({ error: "Aucun utilisateur selectionne." }, { status: 400 });
+      return NextResponse.json(
+        { error: target === "visitors" ? "Aucun visiteur selectionne." : "Aucun utilisateur selectionne." },
+        { status: 400 },
+      );
+    }
+
+    if (target === "visitors") {
+      const deletedCounts = {
+        visitor_sessions: 0,
+        article_views: 0,
+        video_views: 0,
+        carts: 0,
+      };
+
+      const { data: deletedSessions, error: sessionsError } = await supabaseAdmin
+        .from("visitor_sessions")
+        .delete()
+        .in("visitor_key", ids)
+        .is("user_id", null)
+        .select("visitor_key");
+      if (sessionsError && !isMissingTableError(sessionsError)) throw sessionsError;
+      deletedCounts.visitor_sessions = (deletedSessions || []).length;
+
+      const { data: deletedArticleViews, error: articleError } = await supabaseAdmin
+        .from("article_views")
+        .delete()
+        .in("viewer_key", ids)
+        .is("user_id", null)
+        .select("viewer_key");
+      if (articleError && !isMissingTableError(articleError)) throw articleError;
+      deletedCounts.article_views = (deletedArticleViews || []).length;
+
+      const { data: deletedVideoViews, error: videoError } = await supabaseAdmin
+        .from("video_views")
+        .delete()
+        .in("viewer_key", ids)
+        .is("user_id", null)
+        .select("viewer_key");
+      if (videoError && !isMissingTableError(videoError)) throw videoError;
+      deletedCounts.video_views = (deletedVideoViews || []).length;
+
+      const { data: deletedCarts, error: cartsError } = await supabaseAdmin
+        .from("carts")
+        .delete()
+        .in("session_id", ids)
+        .is("user_id", null)
+        .select("session_id");
+      if (cartsError && !isMissingTableError(cartsError)) throw cartsError;
+      deletedCounts.carts = (deletedCarts || []).length;
+
+      await supabaseAdmin.from("audit_logs").insert({
+        user_id: access.userId,
+        action: "delete",
+        table_name: "anonymous_visitors",
+        new_data: { ids, mode: "bulk_delete", deleted_counts: deletedCounts },
+      });
+
+      return NextResponse.json({
+        success: true,
+        target: "visitors",
+        deleted_ids: ids,
+        deleted_counts: deletedCounts,
+      });
     }
 
     if (ids.includes(access.userId)) {
@@ -665,6 +734,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      target: "users",
       deleted_count: deletedIds.length,
       deleted_ids: deletedIds,
     });

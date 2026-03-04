@@ -18,6 +18,7 @@ interface CheckoutCartItemRow {
   produit_id: string | null;
   formation_id: string | null;
   video_id: string | null;
+  // Supabase relation payload may be a single object or an array depending on query typing.
   produit?: {
     id: string;
     name: string;
@@ -25,20 +26,38 @@ interface CheckoutCartItemRow {
     is_digital: boolean;
     status: string;
     stock: number | null;
-  } | null;
+  } | {
+    id: string;
+    name: string;
+    slug: string;
+    is_digital: boolean;
+    status: string;
+    stock: number | null;
+  }[] | null;
   formation?: {
     id: string;
     title: string;
     slug: string;
     status: string;
     is_free: boolean;
-  } | null;
+  } | {
+    id: string;
+    title: string;
+    slug: string;
+    status: string;
+    is_free: boolean;
+  }[] | null;
   video?: {
     id: string;
     title: string;
     slug: string;
     status: string;
-  } | null;
+  } | {
+    id: string;
+    title: string;
+    slug: string;
+    status: string;
+  }[] | null;
 }
 
 interface ShippingAddress {
@@ -125,10 +144,15 @@ function parseBody(payload: unknown) {
   return { paymentMethod, shipping, cartItems: Array.from(merged.values()) };
 }
 
+function getSingleRelation<T>(relation: T | T[] | null | undefined): T | null {
+  if (Array.isArray(relation)) return relation[0] ?? null;
+  return relation ?? null;
+}
+
 function getItemName(item: CheckoutCartItemRow) {
-  if (item.item_type === 'produit') return item.produit?.name ?? 'Produit';
-  if (item.item_type === 'formation') return item.formation?.title ?? 'Formation';
-  return item.video?.title ?? 'Video';
+  if (item.item_type === 'produit') return getSingleRelation(item.produit)?.name ?? 'Produit';
+  if (item.item_type === 'formation') return getSingleRelation(item.formation)?.title ?? 'Formation';
+  return getSingleRelation(item.video)?.title ?? 'Video';
 }
 
 function getPaymentProvider(method: PaymentInputMethod): PaymentProvider {
@@ -158,7 +182,10 @@ function buildInitialItemWorkflow(item: CheckoutCartItemRow, nowIso: string) {
     };
   }
 
-  if (item.item_type === 'video' || (item.item_type === 'produit' && item.produit?.is_digital)) {
+  if (
+    item.item_type === 'video' ||
+    (item.item_type === 'produit' && getSingleRelation(item.produit)?.is_digital)
+  ) {
     return {
       item_status: 'delivered',
       authorized_at: null,
@@ -391,8 +418,8 @@ export async function POST(request: NextRequest) {
 
     let userCartId = userCart?.id ?? null;
     if (!userCartId) {
-      const { data: createdCart, error: createCartError } = await supabaseAdmin
-        .from('carts')
+      const { data: createdCart, error: createCartError } = await (supabaseAdmin
+        .from('carts') as any)
         .insert({ user_id: user.id, session_id: null })
         .select('id')
         .single();
@@ -438,12 +465,12 @@ export async function POST(request: NextRequest) {
 
     const unavailableItems = cartItems.filter((item) => {
       if (item.item_type === 'produit') {
-        return !item.produit || item.produit.status !== 'published';
+        return getSingleRelation(item.produit)?.status !== 'published';
       }
       if (item.item_type === 'formation') {
-        return !item.formation || item.formation.status !== 'published';
+        return getSingleRelation(item.formation)?.status !== 'published';
       }
-      return !item.video || item.video.status !== 'published';
+      return getSingleRelation(item.video)?.status !== 'published';
     });
 
     if (unavailableItems.length > 0) {
@@ -459,7 +486,7 @@ export async function POST(request: NextRequest) {
     const insufficientStockItems = cartItems
       .filter((item) => item.item_type === 'produit')
       .map((item) => {
-        const available = item.produit?.stock;
+        const available = getSingleRelation(item.produit)?.stock;
         const requested = Math.max(1, Number(item.quantity || 1));
         if (available === null || typeof available !== 'number') {
           return null;
@@ -494,7 +521,7 @@ export async function POST(request: NextRequest) {
     }
 
     const hasPhysicalProducts = cartItems.some(
-      (item) => item.item_type === 'produit' && !item.produit?.is_digital,
+      (item) => item.item_type === 'produit' && !getSingleRelation(item.produit)?.is_digital,
     );
 
     if (!shipping.first_name || !shipping.last_name || !shipping.country) {
@@ -604,8 +631,8 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const { error: orderItemsError } = await supabaseAdmin
-      .from('commande_items')
+    const { error: orderItemsError } = await (supabaseAdmin
+      .from('commande_items') as any)
       .insert(orderItemsPayload);
 
     if (orderItemsError) {
@@ -618,8 +645,8 @@ export async function POST(request: NextRequest) {
       .slice(2, 8)
       .toUpperCase()}`;
 
-    const { data: payment, error: paymentError } = await supabaseAdmin
-      .from('paiements')
+    const { data: payment, error: paymentError } = await (supabaseAdmin
+      .from('paiements') as any)
       .insert({
         user_id: user.id,
         commande_id: order.id,

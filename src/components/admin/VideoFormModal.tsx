@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,27 @@ interface VideoFormModalProps {
   isLoading?: boolean;
 }
 
+const EMPTY_VIDEO_FORM_DATA: Partial<Video> = {
+  title: "",
+  slug: "",
+  video_url: "",
+  video_type: "upload",
+  thumbnail_url: null,
+  access_type: "public",
+  price: 0,
+  status: "draft",
+  category_id: null,
+  playlist_id: null,
+};
+
+function getInitialVideoFormData(video?: Video): Partial<Video> {
+  if (!video) return { ...EMPTY_VIDEO_FORM_DATA };
+  return {
+    ...EMPTY_VIDEO_FORM_DATA,
+    ...video,
+  };
+}
+
 export function VideoFormModal({
   isOpen,
   onClose,
@@ -22,59 +43,30 @@ export function VideoFormModal({
   video,
   isLoading = false,
 }: VideoFormModalProps) {
-  const [formData, setFormData] = useState<Partial<Video>>({
-    title: "",
-    slug: "",
-    video_url: "",
-    video_type: "upload",
-    thumbnail_url: null,
-    access_type: "public",
-    price: 0,
-    status: "draft",
-    category_id: null,
-    playlist_id: null,
-  });
-
-  useEffect(() => {
-    if (video) {
-      setFormData(video);
-    } else {
-      setFormData({
-        title: "",
-        slug: "",
-        video_url: "",
-        video_type: "upload",
-        thumbnail_url: null,
-        access_type: "public",
-        price: 0,
-        status: "draft",
-        category_id: null,
-        playlist_id: null,
-      });
-    }
-  }, [video, isOpen]);
+  const [formData, setFormData] = useState<Partial<Video>>(() =>
+    getInitialVideoFormData(video),
+  );
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value, type } = e.target;
     const newValue = type === "number" ? parseFloat(value) || 0 : value;
+    const generatedSlug =
+      name === "title"
+        ? value
+            .toLowerCase()
+            .trim()
+            .replace(/[^\w\s-]/g, "")
+            .replace(/\s+/g, "-")
+            .replace(/-+/g, "-")
+        : undefined;
 
-    let updatedData = {
+    const updatedData = {
       ...formData,
       [name]: newValue,
+      ...(generatedSlug !== undefined ? { slug: generatedSlug } : {}),
     };
-
-    // Auto-generate slug from title
-    if (name === "title") {
-      const slug = value
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-");
-      updatedData.slug = slug;
-    }
 
     setFormData(updatedData);
   };
@@ -234,7 +226,7 @@ export function VideoFormModal({
                     onThumbnailChange={(thumbnailUrl) =>
                       setFormData({ ...formData, thumbnail_url: thumbnailUrl })
                     }
-                    currentUrl={formData.video_url}
+                    currentUrl={formData.video_url ?? undefined}
                     currentThumbnail={formData.thumbnail_url}
                   />
                 </div>

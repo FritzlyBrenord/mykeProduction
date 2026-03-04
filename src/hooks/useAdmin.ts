@@ -17,13 +17,20 @@ export function useDashboardStats() {
 }
 
 // Formations
-export function useFormations(params?: { status?: string; search?: string }) {
+export function useFormations(params?: { 
+  status?: string; 
+  search?: string; 
+  page?: number;
+  limit?: number;
+}) {
   return useQuery({
-    queryKey: ['admin', 'formations', params?.status, params?.search],
+    queryKey: ['admin', 'formations', params?.status, params?.search, params?.page, params?.limit],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
       if (params?.status) searchParams.set('status', params.status);
       if (params?.search) searchParams.set('search', params.search);
+      if (params?.page) searchParams.set('page', params.page.toString());
+      if (params?.limit) searchParams.set('limit', params.limit.toString());
 
       const res = await fetch(`/api/admin/formations?${searchParams}`);
       if (!res.ok) {

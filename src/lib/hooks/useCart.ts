@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { CartItem, Formation, Produit, Video } from '@/lib/types';
-import { Session, SupabaseClient } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import React from 'react';
 import {
   ReactNode,
@@ -67,6 +67,7 @@ interface DbCartItemRow {
 
 const LOCAL_CART_KEY = 'myke:guest-cart:v1';
 const LOCAL_ITEM_PREFIX = 'local:';
+type BrowserSupabaseClient = ReturnType<typeof createClient>;
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -153,7 +154,7 @@ function readGuestCart(): GuestCartEntry[] {
           is_digital: typeof row.is_digital === 'boolean' ? row.is_digital : null,
         } satisfies GuestCartEntry;
       })
-      .filter((entry): entry is GuestCartEntry => Boolean(entry));
+      .filter(Boolean) as GuestCartEntry[];
 
     const merged = new Map<string, GuestCartEntry>();
     sanitized.forEach((entry) => {
@@ -332,12 +333,13 @@ function mapGuestEntriesToLocalOnly(entries: GuestCartEntry[]): CartItem[] {
   }));
 }
 
-async function ensureUserCartId(supabase: SupabaseClient, userId: string): Promise<string | null> {
-  const { data: existingCart, error: existingError } = await supabase
-    .from('carts')
+async function ensureUserCartId(supabase: BrowserSupabaseClient, userId: string): Promise<string | null> {
+  const { data: existingCartRaw, error: existingError } = await (supabase
+    .from('carts') as any)
     .select('id')
     .eq('user_id', userId)
     .maybeSingle();
+  const existingCart = (existingCartRaw ?? null) as { id?: string } | null;
 
   if (existingError) {
     console.error('Error loading user cart:', existingError);
@@ -346,22 +348,23 @@ async function ensureUserCartId(supabase: SupabaseClient, userId: string): Promi
 
   if (existingCart?.id) return existingCart.id;
 
-  const { data: inserted, error: insertError } = await supabase
-    .from('carts')
+  const { data: insertedRaw, error: insertError } = await (supabase
+    .from('carts') as any)
     .insert({ user_id: userId, session_id: null })
     .select('id')
     .single();
+  const inserted = (insertedRaw ?? null) as { id?: string } | null;
 
   if (insertError) {
     console.error('Error creating user cart:', insertError);
     return null;
   }
 
-  return inserted.id;
+  return inserted?.id ?? null;
 }
 
 async function getSessionSafe(
-  client: SupabaseClient,
+  client: BrowserSupabaseClient,
   timeoutMs: number = 1800,
 ): Promise<Session | null> {
   try {
@@ -374,7 +377,9 @@ async function getSessionSafe(
 
     if (!result) return null;
 
-    const sessionResult = result as Awaited<ReturnType<SupabaseClient['auth']['getSession']>>;
+    const sessionResult = result as Awaited<
+      ReturnType<BrowserSupabaseClient['auth']['getSession']>
+    >;
     if (sessionResult.error) {
       const message = String(sessionResult.error.message || '').toLowerCase();
       if (!message.includes('auth session missing')) {
@@ -392,10 +397,10 @@ async function getSessionSafe(
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+  const [supabase, setSupabase] = useState<BrowserSupabaseClient | null>(null);
 
   const fetchGuestCart = useCallback(
-    async (client: SupabaseClient) => {
+    async (client: BrowserSupabaseClient) => {
       const entries = readGuestCart();
       if (entries.length === 0) {
         setItems([]);
@@ -417,12 +422,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const videosById = new Map<string, Video>();
 
       if (productIds.length > 0) {
-        const { data } = await client
-          .from('produits')
+        const { data: productsRaw } = await (client
+          .from('produits') as any)
           .select('*')
           .in('id', productIds)
           .eq('status', 'published');
-        (data ?? []).forEach((row) => productsById.set(row.id, row as Produit));
+        const products = (productsRaw ?? []) as Produit[];
+        products.forEach((row) => {
+          if (row?.id) productsById.set(row.id, row);
+        });
 
         const missingProductIds = productIds.filter((id) => !productsById.has(id));
         if (missingProductIds.length > 0) {
@@ -446,12 +454,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
 
       if (formationIds.length > 0) {
-        const { data } = await client
-          .from('formations')
+        const { data: formationsRaw } = await (client
+          .from('formations') as any)
           .select('*')
           .in('id', formationIds)
           .eq('status', 'published');
-        (data ?? []).forEach((row) => formationsById.set(row.id, row as Formation));
+        const formations = (formationsRaw ?? []) as Formation[];
+        formations.forEach((row) => {
+          if (row?.id) formationsById.set(row.id, row);
+        });
 
         const missingFormationIds = formationIds.filter((id) => !formationsById.has(id));
         if (missingFormationIds.length > 0) {
@@ -475,12 +486,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
 
       if (videoIds.length > 0) {
-        const { data } = await client
-          .from('videos')
+        const { data: videosRaw } = await (client
+          .from('videos') as any)
           .select('*')
           .in('id', videoIds)
           .eq('status', 'published');
-        (data ?? []).forEach((row) => videosById.set(row.id, row as Video));
+        const videos = (videosRaw ?? []) as Video[];
+        videos.forEach((row) => {
+          if (row?.id) videosById.set(row.id, row);
+        });
       }
 
       setItems(mapGuestToCartItems(entries, productsById, formationsById, videosById));
@@ -488,15 +502,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const fetchUserCart = useCallback(async (client: SupabaseClient, userId: string) => {
+  const fetchUserCart = useCallback(async (client: BrowserSupabaseClient, userId: string) => {
     const cartId = await ensureUserCartId(client, userId);
     if (!cartId) {
       setItems([]);
       return;
     }
 
-    const { data, error } = await client
-      .from('cart_items')
+    const { data: cartRowsRaw, error } = await (client
+      .from('cart_items') as any)
       .select(
         `
           *,
@@ -514,20 +528,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setItems(mapDbRowsToCartItems((data ?? []) as DbCartItemRow[]));
+    setItems(mapDbRowsToCartItems((cartRowsRaw ?? []) as DbCartItemRow[]));
   }, []);
 
-  const syncGuestCartToUser = useCallback(async (client: SupabaseClient, userId: string) => {
+  const syncGuestCartToUser = useCallback(async (client: BrowserSupabaseClient, userId: string) => {
     const guestEntries = readGuestCart();
     if (guestEntries.length === 0) return;
 
     const cartId = await ensureUserCartId(client, userId);
     if (!cartId) return;
 
-    const { data: existingItems, error: existingError } = await client
-      .from('cart_items')
+    const { data: existingItemsRaw, error: existingError } = await (client
+      .from('cart_items') as any)
       .select('id,item_type,produit_id,formation_id,video_id,quantity')
       .eq('cart_id', cartId);
+    const existingItems = (existingItemsRaw ?? []) as Array<{
+      id: string;
+      item_type: CartItemType;
+      produit_id: string | null;
+      formation_id: string | null;
+      video_id: string | null;
+      quantity: number | null;
+    }>;
 
     if (existingError) {
       console.error('Error loading existing cart items before sync:', existingError);
@@ -535,7 +557,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     const existingByKey = new Map<string, { id: string; quantity: number }>();
-    (existingItems ?? []).forEach((item) => {
+    existingItems.forEach((item) => {
       const itemId =
         item.item_type === 'produit'
           ? item.produit_id
@@ -556,8 +578,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       if (existing) {
         const nextQuantity = normalizeQuantity(existing.quantity + entry.quantity);
-        const { error } = await client
-          .from('cart_items')
+        const { error } = await (client
+          .from('cart_items') as any)
           .update({ quantity: nextQuantity })
           .eq('id', existing.id);
         if (error) {
@@ -572,7 +594,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           [foreignField]: entry.item_id,
         };
 
-        const { error } = await client.from('cart_items').insert(payload);
+        const { error } = await (client.from('cart_items') as any).insert(payload);
         if (error) {
           console.error('Error inserting cart item during sync:', error);
         }
@@ -771,11 +793,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
       let maxStock: number | null = null;
 
       if (input.item_type === 'produit') {
-        const { data: product, error: productError } = await supabase
-          .from('produits')
+        const { data: productRaw, error: productError } = await (supabase
+          .from('produits') as any)
           .select('id,status,stock,min_order')
           .eq('id', input.item_id)
           .maybeSingle();
+        const product = (productRaw ?? null) as {
+          id: string;
+          status: string;
+          stock: number | null;
+          min_order: number | null;
+        } | null;
 
         if (productError) {
           console.error('Error validating product before cart add:', productError);
@@ -805,13 +833,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
 
       const foreignField = `${input.item_type}_id` as 'produit_id' | 'formation_id' | 'video_id';
-      const { data: existing, error: existingError } = await supabase
-        .from('cart_items')
+      const { data: existingRaw, error: existingError } = await (supabase
+        .from('cart_items') as any)
         .select('id,quantity')
         .eq('cart_id', cartId)
         .eq('item_type', input.item_type)
         .eq(foreignField, input.item_id)
         .maybeSingle();
+      const existing = (existingRaw ?? null) as { id: string; quantity: number | null } | null;
 
       if (existingError) {
         console.error('Error loading cart item before add:', existingError);
@@ -823,8 +852,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (maxStock !== null && nextQuantity > maxStock) {
           throw new Error('Quantite demandee superieure au stock.');
         }
-        const { error } = await supabase
-          .from('cart_items')
+        const { error } = await (supabase
+          .from('cart_items') as any)
           .update({ quantity: nextQuantity, unit_price: unitPrice })
           .eq('id', existing.id);
         if (error) {
@@ -839,7 +868,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           quantity,
           [foreignField]: input.item_id,
         };
-        const { error } = await supabase.from('cart_items').insert(payload);
+        const { error } = await (supabase.from('cart_items') as any).insert(payload);
         if (error) {
           console.error('Error inserting cart item:', error);
           throw new Error("Erreur pendant l'ajout au panier.");
@@ -878,7 +907,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { error } = await supabase.from('cart_items').delete().eq('id', itemId);
+      const { error } = await (supabase.from('cart_items') as any).delete().eq('id', itemId);
       if (error) {
         console.error('Error removing cart item:', error);
         return;
@@ -936,8 +965,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { error } = await supabase
-        .from('cart_items')
+      const { error } = await (supabase
+        .from('cart_items') as any)
         .update({ quantity: safeQuantity })
         .eq('id', itemId);
 
@@ -970,7 +999,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const cartId = await ensureUserCartId(supabase, session.user.id);
     if (!cartId) return;
 
-    const { error } = await supabase.from('cart_items').delete().eq('cart_id', cartId);
+    const { error } = await (supabase.from('cart_items') as any).delete().eq('cart_id', cartId);
     if (error) {
       console.error('Error clearing user cart:', error);
       return;

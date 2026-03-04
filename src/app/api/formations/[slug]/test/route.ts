@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
 
 export async function GET(
   request: NextRequest,
@@ -11,8 +10,7 @@ export async function GET(
     const slug = resolvedParams.slug;
     console.log("Test API - Slug reçu:", slug);
     
-    const cookieStore = await cookies();
-    const supabase = await createClient(cookieStore);
+    const supabase = await createClient();
     console.log("Test API - Client Supabase créé:", !!supabase);
 
     // Test simple : chercher toutes les formations
