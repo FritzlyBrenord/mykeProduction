@@ -476,7 +476,7 @@ export default function FormationLearningPage() {
   if (!formation) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center bg-[hsl(var(--cream))]"
+        className="flex min-h-screen  py-20 items-center justify-center bg-[hsl(var(--cream))]"
         style={bodyStyle}
       >
         <Card className="w-full max-w-md border-zinc-200 shadow-xl">
@@ -568,7 +568,9 @@ export default function FormationLearningPage() {
                       {formation.language}
                     </Badge>
                     <Badge className="bg-white/15 text-white backdrop-blur">
-                      {formation.certificate ? "Certificat inclus" : "Sans certificat"}
+                      {formation.certificate
+                        ? "Certificat inclus"
+                        : "Sans certificat"}
                     </Badge>
                   </div>
                   {selectedTrackItem ? (

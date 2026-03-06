@@ -32,13 +32,17 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-function validatePassword(password: string): { valid: boolean; errors: string[] } {
+function validatePassword(password: string): {
+  valid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
   if (password.length < 8) errors.push("Au moins 8 caracteres");
   if (!/[A-Z]/.test(password)) errors.push("Une majuscule");
   if (!/[a-z]/.test(password)) errors.push("Une minuscule");
   if (!/[0-9]/.test(password)) errors.push("Un chiffre");
-  if (!/[!@#$%^&*(),.?\":{}|<>]/.test(password)) errors.push("Un caractere special");
+  if (!/[!@#$%^&*(),.?\":{}|<>]/.test(password))
+    errors.push("Un caractere special");
   return { valid: errors.length === 0, errors };
 }
 
@@ -129,21 +133,32 @@ function formatAuthError(message: string) {
     return "Le lien de reinitialisation est invalide. Demandez un nouveau lien.";
   }
 
-  if (normalized.includes("rate limit") ||
+  if (
+    normalized.includes("rate limit") ||
     normalized.includes("over_email_send_rate_limit")
   ) {
     return "Trop de demandes. Attendez avant de renvoyer un nouvel email.";
   }
 
-  if (normalized.includes("same as the old password") || normalized.includes("different from the old")) {
+  if (
+    normalized.includes("same as the old password") ||
+    normalized.includes("different from the old")
+  ) {
     return "Le nouveau mot de passe doit etre different de l'ancien.";
   }
 
   // If we don't have a custom translation, show the actual Supabase error so we can debug it
-  return message || "Action impossible pour le moment. Reessayez dans quelques instants.";
+  return (
+    message ||
+    "Action impossible pour le moment. Reessayez dans quelques instants."
+  );
 }
 
-async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string) {
+async function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  message: string,
+) {
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   try {
@@ -167,7 +182,8 @@ function formatHashAuthError(
     return null;
   }
 
-  const joined = `${payload.errorCode} ${payload.error} ${payload.errorDescription}`.toLowerCase();
+  const joined =
+    `${payload.errorCode} ${payload.error} ${payload.errorDescription}`.toLowerCase();
 
   if (joined.includes("otp_expired") || joined.includes("expired")) {
     return "Le lien de reinitialisation a expire. Entrez votre email pour recevoir un nouveau lien.";
@@ -189,7 +205,9 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [mode, setMode] = useState<"request" | "recovery" | "emailSent" | "done">("request");
+  const [mode, setMode] = useState<
+    "request" | "recovery" | "emailSent" | "done"
+  >("request");
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
@@ -246,15 +264,19 @@ export default function ResetPasswordPage() {
             const recoveryTokens = readRecoveryTokensFromUrl();
 
             if (recoveryTokens) {
-              const { data: recoveredSessionData, error: recoveredSessionError } =
-                await supabase.auth.setSession({
-                  access_token: recoveryTokens.accessToken,
-                  refresh_token: recoveryTokens.refreshToken,
-                });
+              const {
+                data: recoveredSessionData,
+                error: recoveredSessionError,
+              } = await supabase.auth.setSession({
+                access_token: recoveryTokens.accessToken,
+                refresh_token: recoveryTokens.refreshToken,
+              });
 
               if (recoveredSessionError) {
                 if (!active) return;
-                setErrorMessage(formatAuthError(recoveredSessionError.message || ""));
+                setErrorMessage(
+                  formatAuthError(recoveredSessionError.message || ""),
+                );
                 setMode("request");
                 return;
               }
@@ -267,9 +289,13 @@ export default function ResetPasswordPage() {
 
           if (session?.user) {
             setMode("recovery");
-            setSuccessMessage("Lien valide. Definissez maintenant un nouveau mot de passe.");
+            setSuccessMessage(
+              "Lien valide. Definissez maintenant un nouveau mot de passe.",
+            );
           } else {
-            setErrorMessage("Lien invalide ou expire. Demandez un nouveau lien.");
+            setErrorMessage(
+              "Lien invalide ou expire. Demandez un nouveau lien.",
+            );
             setMode("request");
           }
           return;
@@ -280,7 +306,9 @@ export default function ResetPasswordPage() {
         }
       } catch {
         if (active) {
-          setErrorMessage("Impossible de verifier le lien de reinitialisation.");
+          setErrorMessage(
+            "Impossible de verifier le lien de reinitialisation.",
+          );
           setMode("request");
         }
       } finally {
@@ -298,7 +326,9 @@ export default function ResetPasswordPage() {
       if (event === "PASSWORD_RECOVERY") {
         setMode("recovery");
         setErrorMessage(null);
-        setSuccessMessage("Lien valide. Definissez maintenant un nouveau mot de passe.");
+        setSuccessMessage(
+          "Lien valide. Definissez maintenant un nouveau mot de passe.",
+        );
       }
     });
 
@@ -312,7 +342,9 @@ export default function ResetPasswordPage() {
     event.preventDefault();
 
     if (resendCooldownSeconds > 0) {
-      setErrorMessage(`Nouvel envoi disponible dans ${resendCooldownSeconds}s.`);
+      setErrorMessage(
+        `Nouvel envoi disponible dans ${resendCooldownSeconds}s.`,
+      );
       return;
     }
 
@@ -329,12 +361,13 @@ export default function ResetPasswordPage() {
         },
         body: JSON.stringify({ email: normalizedEmail }),
       });
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
 
       if (!response.ok) {
-        const serverError = payload?.error || "Envoi impossible pour le moment.";
+        const serverError =
+          payload?.error || "Envoi impossible pour le moment.";
         setErrorMessage(serverError);
         toast.error("Envoi impossible.");
         return;
@@ -365,7 +398,9 @@ export default function ResetPasswordPage() {
     }
 
     if (!passwordValidation.valid) {
-      setErrorMessage("Le nouveau mot de passe ne respecte pas les criteres de securite.");
+      setErrorMessage(
+        "Le nouveau mot de passe ne respecte pas les criteres de securite.",
+      );
       return;
     }
 
@@ -385,7 +420,9 @@ export default function ResetPasswordPage() {
       }
 
       setMode("done");
-      setSuccessMessage("Mot de passe mis a jour avec succes. Connectez-vous avec le nouveau mot de passe.");
+      setSuccessMessage(
+        "Mot de passe mis a jour avec succes. Connectez-vous avec le nouveau mot de passe.",
+      );
       toast.success("Mot de passe mis a jour.");
 
       void supabase.auth.signOut().catch(() => {
@@ -396,7 +433,9 @@ export default function ResetPasswordPage() {
         router.replace("/auth/connexion");
       }, 1200);
     } catch {
-      setErrorMessage("Une erreur est survenue pendant la mise a jour du mot de passe.");
+      setErrorMessage(
+        "Une erreur est survenue pendant la mise a jour du mot de passe.",
+      );
       toast.error("Une erreur est survenue.");
     } finally {
       setIsSubmittingPassword(false);
@@ -458,7 +497,8 @@ export default function ResetPasswordPage() {
               transition={{ delay: 0.4, duration: 0.6 }}
               className="text-lg text-slate-300 max-w-md leading-relaxed"
             >
-              Recuperez l&apos;acces a votre espace professionnel en toute securite.
+              Recuperez l&apos;acces a votre espace professionnel en toute
+              securite.
             </motion.p>
 
             <motion.div
@@ -477,13 +517,17 @@ export default function ResetPasswordPage() {
                 <div className="w-10 h-10 rounded-lg bg-amber-400/10 flex items-center justify-center">
                   <Shield className="h-5 w-5 text-amber-400" />
                 </div>
-                <span className="text-sm">Validation securisee par Supabase</span>
+                <span className="text-sm">
+                  Validation securisee par Supabase
+                </span>
               </div>
               <div className="flex items-center gap-3 text-slate-300">
                 <div className="w-10 h-10 rounded-lg bg-amber-400/10 flex items-center justify-center">
                   <Zap className="h-5 w-5 text-amber-400" />
                 </div>
-                <span className="text-sm">Reconnexion immediate apres changement</span>
+                <span className="text-sm">
+                  Reconnexion immediate apres changement
+                </span>
               </div>
             </motion.div>
           </div>
@@ -507,7 +551,9 @@ export default function ResetPasswordPage() {
 
           <div className="text-center mb-8">
             <h2 className="font-[family-name:var(--font-playfair)] text-2xl font-semibold text-slate-900 mb-2">
-              {showRecoveryForm ? "Nouveau mot de passe" : "Mot de passe oublie"}
+              {showRecoveryForm
+                ? "Nouveau mot de passe"
+                : "Mot de passe oublie"}
             </h2>
             <p className="text-slate-500 text-sm">
               {showRecoveryForm
@@ -560,7 +606,7 @@ export default function ResetPasswordPage() {
               <Button
                 type="submit"
                 disabled={isSubmittingEmail || resendCooldownSeconds > 0}
-                className="w-full h-12 bg-slate-900 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 text-base font-medium disabled:opacity-60"
+                className="w-full h-12 bg-slate-900 text-amber-50 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 text-base font-medium disabled:opacity-60"
               >
                 {isSubmittingEmail ? (
                   <div className="flex items-center gap-2">
@@ -582,7 +628,10 @@ export default function ResetPasswordPage() {
           {showRecoveryForm && !isInitializing && (
             <form onSubmit={handleUpdatePassword} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="new-password" className="text-slate-700 font-medium">
+                <Label
+                  htmlFor="new-password"
+                  className="text-slate-700 font-medium"
+                >
                   Nouveau mot de passe
                 </Label>
                 <div className="relative group">
@@ -600,15 +649,26 @@ export default function ResetPasswordPage() {
                     type="button"
                     onClick={() => setShowNewPassword((prev) => !prev)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                    aria-label={showNewPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                    aria-label={
+                      showNewPassword
+                        ? "Masquer le mot de passe"
+                        : "Afficher le mot de passe"
+                    }
                   >
-                    {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {showNewPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
                   </button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirm-password" className="text-slate-700 font-medium">
+                <Label
+                  htmlFor="confirm-password"
+                  className="text-slate-700 font-medium"
+                >
                   Confirmer le mot de passe
                 </Label>
                 <div className="relative group">
@@ -626,16 +686,26 @@ export default function ResetPasswordPage() {
                     type="button"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                    aria-label={showConfirmPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                    aria-label={
+                      showConfirmPassword
+                        ? "Masquer le mot de passe"
+                        : "Afficher le mot de passe"
+                    }
                   >
-                    {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
                   </button>
                 </div>
               </div>
 
               {newPassword.length > 0 && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1">
-                  <p className="text-xs font-medium text-slate-700">Criteres de securite:</p>
+                  <p className="text-xs font-medium text-slate-700">
+                    Criteres de securite:
+                  </p>
                   <ul className="text-xs space-y-1 text-slate-600">
                     <li>Au moins 8 caracteres</li>
                     <li>Au moins 1 majuscule, 1 minuscule, 1 chiffre</li>
@@ -652,7 +722,7 @@ export default function ResetPasswordPage() {
               <Button
                 type="submit"
                 disabled={isSubmittingPassword}
-                className="w-full h-12 bg-slate-900 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 text-base font-medium disabled:opacity-60"
+                className="w-full h-12 bg-slate-900 text-gray-100 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 text-base font-medium disabled:opacity-60"
               >
                 {isSubmittingPassword ? (
                   <div className="flex items-center gap-2">

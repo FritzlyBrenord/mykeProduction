@@ -269,7 +269,7 @@ export default function CartPage() {
                     </div>
 
                     <Button
-                      className="w-full mt-6 bg-slate-900 hover:bg-amber-500 hover:text-slate-950 h-12"
+                      className="w-full mt-6 bg-slate-900 text-gray-100 hover:bg-amber-500 hover:text-slate-950 h-12"
                       onClick={handleCheckout}
                     >
                       Passer a la caisse

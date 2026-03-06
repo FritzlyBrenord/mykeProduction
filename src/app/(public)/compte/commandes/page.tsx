@@ -1,22 +1,22 @@
-'use client';
+"use client";
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   orderItemProgressPercent,
   orderItemStatusLabel,
   orderProgressPercent,
-} from '@/lib/orders/tracking';
-import { formatDate, formatPrice } from '@/lib/utils/format';
-import { motion } from 'framer-motion';
+} from "@/lib/orders/tracking";
+import { formatDate, formatPrice } from "@/lib/utils/format";
+import { motion } from "framer-motion";
 import {
   AlertCircle,
   CheckCircle2,
@@ -27,14 +27,14 @@ import {
   PlayCircle,
   Truck,
   XCircle,
-} from 'lucide-react';
-import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
+} from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 interface OrderItem {
   id: string;
-  item_type: 'produit' | 'formation' | 'video';
+  item_type: "produit" | "formation" | "video";
   item_status: string;
   authorized_at?: string | null;
   processing_at?: string | null;
@@ -46,7 +46,11 @@ interface OrderItem {
   total_price: number;
   formation_authorized?: boolean | null;
   formation_progress?: number | null;
-  produit: { name: string | null; slug: string | null; type?: string | null } | null;
+  produit: {
+    name: string | null;
+    slug: string | null;
+    type?: string | null;
+  } | null;
   formation: { title: string | null; slug: string | null } | null;
   video: { title: string | null; slug: string | null } | null;
 }
@@ -61,10 +65,10 @@ interface Order {
   currency: string;
   shipping_address: Record<string, unknown> | null;
   estimated_delivery_at?: string | null;
-  payment_method: 'stripe' | 'paypal' | null;
+  payment_method: "stripe" | "paypal" | null;
   payment?: {
     id: string;
-    provider: 'stripe' | 'paypal';
+    provider: "stripe" | "paypal";
     status: string | null;
     amount: number;
     metadata: Record<string, unknown> | null;
@@ -79,38 +83,38 @@ const statusConfig: Record<
   { label: string; className: string; icon: typeof Clock }
 > = {
   pending: {
-    label: 'En attente',
-    className: 'bg-slate-100 text-slate-700 border-slate-200',
+    label: "En attente",
+    className: "bg-slate-100 text-slate-700 border-slate-200",
     icon: Clock,
   },
   paid: {
-    label: 'Payee',
-    className: 'bg-blue-100 text-blue-700 border-blue-200',
+    label: "Payee",
+    className: "bg-blue-100 text-blue-700 border-blue-200",
     icon: CreditCard,
   },
   processing: {
-    label: 'En preparation',
-    className: 'bg-amber-100 text-amber-800 border-amber-200',
+    label: "En preparation",
+    className: "bg-amber-100 text-amber-800 border-amber-200",
     icon: Package,
   },
   shipped: {
-    label: 'Expediee',
-    className: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    label: "Expediee",
+    className: "bg-indigo-100 text-indigo-700 border-indigo-200",
     icon: Truck,
   },
   delivered: {
-    label: 'Livree',
-    className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    label: "Livree",
+    className: "bg-emerald-100 text-emerald-700 border-emerald-200",
     icon: CheckCircle2,
   },
   cancelled: {
-    label: 'Annulee',
-    className: 'bg-red-100 text-red-700 border-red-200',
+    label: "Annulee",
+    className: "bg-red-100 text-red-700 border-red-200",
     icon: XCircle,
   },
   refunded: {
-    label: 'Remboursee',
-    className: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200',
+    label: "Remboursee",
+    className: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
     icon: CreditCard,
   },
 };
@@ -129,30 +133,39 @@ function orderStatusBadge(status: string) {
 }
 
 function itemLabel(item: OrderItem) {
-  if (item.item_type === 'produit') return item.produit?.name || 'Produit';
-  if (item.item_type === 'formation') return item.formation?.title || 'Formation';
-  return item.video?.title || 'Video';
+  if (item.item_type === "produit") return item.produit?.name || "Produit";
+  if (item.item_type === "formation")
+    return item.formation?.title || "Formation";
+  return item.video?.title || "Video";
 }
 
 function itemTypeBadge(item: OrderItem) {
-  if (item.item_type === 'formation') {
+  if (item.item_type === "formation") {
     return (
-      <Badge className="bg-blue-100 text-blue-700 border-blue-200">Formation</Badge>
+      <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+        Formation
+      </Badge>
     );
   }
-  if (item.item_type === 'video') {
+  if (item.item_type === "video") {
     return (
-      <Badge className="bg-purple-100 text-purple-700 border-purple-200">Video</Badge>
+      <Badge className="bg-purple-100 text-purple-700 border-purple-200">
+        Video
+      </Badge>
     );
   }
-  if (item.produit?.type === 'chimique') {
+  if (item.produit?.type === "chimique") {
     return (
       <Badge className="bg-amber-100 text-amber-800 border-amber-200">
         Produit chimique
       </Badge>
     );
   }
-  return <Badge className="bg-slate-100 text-slate-700 border-slate-200">Produit</Badge>;
+  return (
+    <Badge className="bg-slate-100 text-slate-700 border-slate-200">
+      Produit
+    </Badge>
+  );
 }
 
 function shortOrderId(orderId: string) {
@@ -160,18 +173,22 @@ function shortOrderId(orderId: string) {
 }
 
 function itemStatusClass(status: string) {
-  if (status === 'paid') return 'bg-blue-100 text-blue-700 border-blue-200';
-  if (status === 'processing') return 'bg-amber-100 text-amber-800 border-amber-200';
-  if (status === 'shipped') return 'bg-indigo-100 text-indigo-700 border-indigo-200';
-  if (status === 'delivered') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-  if (status === 'cancelled') return 'bg-red-100 text-red-700 border-red-200';
-  if (status === 'refunded') return 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200';
-  return 'bg-slate-100 text-slate-700 border-slate-200';
+  if (status === "paid") return "bg-blue-100 text-blue-700 border-blue-200";
+  if (status === "processing")
+    return "bg-amber-100 text-amber-800 border-amber-200";
+  if (status === "shipped")
+    return "bg-indigo-100 text-indigo-700 border-indigo-200";
+  if (status === "delivered")
+    return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  if (status === "cancelled") return "bg-red-100 text-red-700 border-red-200";
+  if (status === "refunded")
+    return "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200";
+  return "bg-slate-100 text-slate-700 border-slate-200";
 }
 
 function paymentMethodLabel(method: string | null | undefined) {
-  if (method === 'paypal') return 'Paiement en ligne';
-  return 'Carte';
+  if (method === "paypal") return "Paiement en ligne";
+  return "Carte";
 }
 
 function formationProgressLabel(
@@ -183,7 +200,7 @@ function formationProgressLabel(
   }
   const value = Number(progress ?? 0);
   if (value <= 0) {
-    return 'Non commencee';
+    return "Non commencee";
   }
   return `${value}%`;
 }
@@ -197,15 +214,17 @@ export default function OrdersPage() {
     const loadOrders = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/commandes', { credentials: 'include' });
+        const response = await fetch("/api/commandes", {
+          credentials: "include",
+        });
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data?.error || 'Erreur chargement commandes');
+          throw new Error(data?.error || "Erreur chargement commandes");
         }
         if (!active) return;
         setOrders(Array.isArray(data) ? (data as Order[]) : []);
       } catch (error) {
-        console.error('Orders load error:', error);
+        console.error("Orders load error:", error);
         toast.error("Impossible de recuperer l'historique des commandes.");
       } finally {
         if (active) setLoading(false);
@@ -220,28 +239,32 @@ export default function OrdersPage() {
   const metrics = useMemo(() => {
     const total = orders.length;
     const processing = orders.filter((order) =>
-      ['pending', 'paid', 'processing', 'shipped'].includes(order.status),
+      ["pending", "paid", "processing", "shipped"].includes(order.status),
     ).length;
-    const delivered = orders.filter((order) => order.status === 'delivered').length;
+    const delivered = orders.filter(
+      (order) => order.status === "delivered",
+    ).length;
     const formationPending = orders
       .flatMap((order) => order.items || [])
       .filter(
         (item) =>
-          item.item_type === 'formation' &&
-          (item.formation_authorized === false || item.item_status === 'paid'),
+          item.item_type === "formation" &&
+          (item.formation_authorized === false || item.item_status === "paid"),
       ).length;
     return { total, processing, delivered, formationPending };
   }, [orders]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-100 py-12">
+    <div className="min-h-screen py-30 bg-gradient-to-b from-slate-100 via-white to-slate-100 py-12">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           className="rounded-3xl border border-blue-200 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-800 p-6 md:p-8"
         >
-          <h1 className="text-3xl md:text-4xl font-bold text-white">Mes commandes</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-white">
+            Mes commandes
+          </h1>
           <p className="text-slate-200 mt-2 max-w-3xl">
             Suivez toutes vos commandes en un seul endroit: produits, videos et
             formations.
@@ -257,19 +280,25 @@ export default function OrdersPage() {
           <Card className="border-slate-200">
             <CardContent className="p-5">
               <p className="text-sm text-slate-500">Total commandes</p>
-              <p className="text-3xl font-bold text-slate-900 mt-1">{metrics.total}</p>
+              <p className="text-3xl font-bold text-slate-900 mt-1">
+                {metrics.total}
+              </p>
             </CardContent>
           </Card>
           <Card className="border-slate-200">
             <CardContent className="p-5">
               <p className="text-sm text-slate-500">En cours</p>
-              <p className="text-3xl font-bold text-amber-700 mt-1">{metrics.processing}</p>
+              <p className="text-3xl font-bold text-amber-700 mt-1">
+                {metrics.processing}
+              </p>
             </CardContent>
           </Card>
           <Card className="border-slate-200">
             <CardContent className="p-5">
               <p className="text-sm text-slate-500">Livrees</p>
-              <p className="text-3xl font-bold text-emerald-700 mt-1">{metrics.delivered}</p>
+              <p className="text-3xl font-bold text-emerald-700 mt-1">
+                {metrics.delivered}
+              </p>
             </CardContent>
           </Card>
           <Card className="border-slate-200">
@@ -301,23 +330,28 @@ export default function OrdersPage() {
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-slate-900">{shortOrderId(order.id)}</p>
+                          <p className="font-semibold text-slate-900">
+                            {shortOrderId(order.id)}
+                          </p>
                           {orderStatusBadge(order.status)}
                         </div>
                         <p className="text-sm text-slate-600 mt-1">
                           Passee le {formatDate(order.created_at)}
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
-                          Livraison prevue:{' '}
+                          Livraison prevue:{" "}
                           {order.estimated_delivery_at
                             ? formatDate(order.estimated_delivery_at)
-                            : 'a definir par ladministration'}
+                            : "a definir par ladministration"}
                         </p>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <p className="text-lg font-semibold text-slate-900">
-                          {formatPrice(order.total_amount, order.currency || 'USD')}
+                          {formatPrice(
+                            order.total_amount,
+                            order.currency || "USD",
+                          )}
                         </p>
                         <Link href={`/compte/commandes/${order.id}`}>
                           <Button variant="outline">
@@ -334,13 +368,17 @@ export default function OrdersPage() {
                           </DialogTrigger>
                           <DialogContent className="max-w-3xl">
                             <DialogHeader>
-                              <DialogTitle>Suivi commande {shortOrderId(order.id)}</DialogTitle>
+                              <DialogTitle>
+                                Suivi commande {shortOrderId(order.id)}
+                              </DialogTitle>
                             </DialogHeader>
 
                             <div className="space-y-4">
                               <div className="rounded-xl bg-slate-100 p-4 space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-sm text-slate-600">Statut global</span>
+                                  <span className="text-sm text-slate-600">
+                                    Statut global
+                                  </span>
                                   {orderStatusBadge(order.status)}
                                 </div>
                                 <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
@@ -362,10 +400,14 @@ export default function OrdersPage() {
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2 mb-1">
                                         {itemTypeBadge(item)}
-                                        <Badge className={`${itemStatusClass(item.item_status)} border`}>
-                                          {orderItemStatusLabel(item.item_status)}
+                                        <Badge
+                                          className={`${itemStatusClass(item.item_status)} border`}
+                                        >
+                                          {orderItemStatusLabel(
+                                            item.item_status,
+                                          )}
                                         </Badge>
-                                        {item.item_type === 'formation' &&
+                                        {item.item_type === "formation" &&
                                           (item.formation_authorized ? (
                                             <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
                                               Autorisee
@@ -382,9 +424,9 @@ export default function OrdersPage() {
                                       <p className="text-sm text-slate-600">
                                         Quantite: {item.quantity}
                                       </p>
-                                      {item.item_type === 'formation' && (
+                                      {item.item_type === "formation" && (
                                         <p className="text-sm text-slate-600">
-                                          Acces:{' '}
+                                          Acces:{" "}
                                           {formationProgressLabel(
                                             item.formation_authorized,
                                             item.formation_progress,
@@ -401,7 +443,10 @@ export default function OrdersPage() {
                                       </div>
                                     </div>
                                     <p className="font-semibold text-slate-900">
-                                      {formatPrice(item.total_price, order.currency || 'USD')}
+                                      {formatPrice(
+                                        item.total_price,
+                                        order.currency || "USD",
+                                      )}
                                     </p>
                                   </div>
                                 ))}
@@ -411,8 +456,11 @@ export default function OrdersPage() {
                                 <div className="flex justify-between text-sm text-slate-700">
                                   <span>Paiement</span>
                                   <span className="capitalize">
-                                    {paymentMethodLabel(order.payment?.provider || order.payment_method)} -{' '}
-                                    {(order.payment?.status || 'pending')}
+                                    {paymentMethodLabel(
+                                      order.payment?.provider ||
+                                        order.payment_method,
+                                    )}{" "}
+                                    - {order.payment?.status || "pending"}
                                   </span>
                                 </div>
                                 <div className="flex justify-between text-sm text-slate-700">
@@ -420,29 +468,46 @@ export default function OrdersPage() {
                                   <span>
                                     {order.estimated_delivery_at
                                       ? formatDate(order.estimated_delivery_at)
-                                      : 'A definir'}
+                                      : "A definir"}
                                   </span>
                                 </div>
                                 <div className="flex justify-between text-sm text-slate-700">
                                   <span>Sous-total</span>
-                                  <span>{formatPrice(order.subtotal, order.currency || 'USD')}</span>
+                                  <span>
+                                    {formatPrice(
+                                      order.subtotal,
+                                      order.currency || "USD",
+                                    )}
+                                  </span>
                                 </div>
                                 {order.discount_amount > 0 && (
                                   <div className="flex justify-between text-sm text-emerald-700">
                                     <span>Reduction</span>
                                     <span>
-                                      -{formatPrice(order.discount_amount, order.currency || 'USD')}
+                                      -
+                                      {formatPrice(
+                                        order.discount_amount,
+                                        order.currency || "USD",
+                                      )}
                                     </span>
                                   </div>
                                 )}
                                 <div className="flex justify-between text-sm text-slate-700">
                                   <span>Taxes</span>
-                                  <span>{formatPrice(order.tax_amount, order.currency || 'USD')}</span>
+                                  <span>
+                                    {formatPrice(
+                                      order.tax_amount,
+                                      order.currency || "USD",
+                                    )}
+                                  </span>
                                 </div>
                                 <div className="flex justify-between text-lg font-semibold text-slate-900 pt-2 border-t border-slate-200">
                                   <span>Total</span>
                                   <span>
-                                    {formatPrice(order.total_amount, order.currency || 'USD')}
+                                    {formatPrice(
+                                      order.total_amount,
+                                      order.currency || "USD",
+                                    )}
                                   </span>
                                 </div>
                               </div>
@@ -450,8 +515,9 @@ export default function OrdersPage() {
                               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-start gap-2">
                                 <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                                 <p>
-                                  Les formations apparaissent dans &quot;Mes formations&quot; en attente,
-                                  puis deviennent accessibles des qu&apos;elles sont autorisees.
+                                  Les formations apparaissent dans &quot;Mes
+                                  formations&quot; en attente, puis deviennent
+                                  accessibles des qu&apos;elles sont autorisees.
                                 </p>
                               </div>
                             </div>
@@ -475,19 +541,21 @@ export default function OrdersPage() {
                           >
                             {orderItemStatusLabel(item.item_status)}
                           </span>
-                          {item.item_type === 'formation' && !item.formation_authorized && (
-                            <span className="text-xs text-amber-700 font-medium">
-                              En attente
-                            </span>
-                          )}
-                          {item.item_type === 'formation' && item.formation_authorized && (
-                            <span className="text-xs text-emerald-700 font-medium">
-                              {formationProgressLabel(
-                                item.formation_authorized,
-                                item.formation_progress,
-                              )}
-                            </span>
-                          )}
+                          {item.item_type === "formation" &&
+                            !item.formation_authorized && (
+                              <span className="text-xs text-amber-700 font-medium">
+                                En attente
+                              </span>
+                            )}
+                          {item.item_type === "formation" &&
+                            item.formation_authorized && (
+                              <span className="text-xs text-emerald-700 font-medium">
+                                {formationProgressLabel(
+                                  item.formation_authorized,
+                                  item.formation_progress,
+                                )}
+                              </span>
+                            )}
                         </div>
                       ))}
                       {(order.items || []).length > 4 && (
@@ -505,7 +573,9 @@ export default function OrdersPage() {
           <Card className="border-slate-200">
             <CardContent className="p-12 text-center">
               <Package className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-slate-900 mb-2">Aucune commande</h2>
+              <h2 className="text-xl font-semibold text-slate-900 mb-2">
+                Aucune commande
+              </h2>
               <p className="text-slate-600 mb-6">
                 Vous n&apos;avez pas encore passe de commande.
               </p>

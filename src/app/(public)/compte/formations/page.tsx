@@ -149,7 +149,7 @@ export default function MyFormationsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-100 py-12">
+    <div className="min-h-screen bg-gradient-to-b py-20 from-slate-100 via-white to-slate-100 py-12">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
