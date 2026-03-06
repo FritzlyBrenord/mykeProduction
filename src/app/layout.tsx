@@ -20,6 +20,10 @@ export const metadata: Metadata = {
     "Formations professionnelles, articles experts, produits chimiques certifiés et vidéos exclusives pour les industriels d'élite.",
   keywords:
     "formation industrielle, produits chimiques, articles techniques, vidéos industrie",
+  icons: {
+    icon: "/myke.ico",
+    shortcut: "/myke.ico",
+  },
   openGraph: {
     title: "Myke Industrie",
     description: "Excellence Industrielle",

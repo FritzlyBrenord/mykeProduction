@@ -52,7 +52,8 @@ export default function FormationsPage() {
   const [selectedLevel, setSelectedLevel] = useState("Tous");
   const [selectedFormat, setSelectedFormat] = useState("Tous");
   const [selectedPrice, setSelectedPrice] = useState("Tous");
-  const [selectedSort, setSelectedSort] = useState<(typeof sortOptions)[number]["value"]>("recent");
+  const [selectedSort, setSelectedSort] =
+    useState<(typeof sortOptions)[number]["value"]>("recent");
 
   useEffect(() => {
     let active = true;
@@ -142,7 +143,9 @@ export default function FormationsPage() {
       .map((formation) => formation.category?.name ?? null)
       .filter((name): name is string => Boolean(name));
 
-    const unique = Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+    const unique = Array.from(new Set(names)).sort((a, b) =>
+      a.localeCompare(b),
+    );
     return ["Toutes", ...unique];
   }, [formations]);
 
@@ -158,13 +161,15 @@ export default function FormationsPage() {
       const description = normalizeText(formation.description);
       const categoryName = formation.category?.name ?? "Toutes";
 
-      const matchesSearch = !search || title.includes(search) || description.includes(search);
+      const matchesSearch =
+        !search || title.includes(search) || description.includes(search);
       const matchesCategory =
         selectedCategory === "Toutes" || categoryName === selectedCategory;
       const matchesLevel =
         selectedLevel === "Tous" ||
         (selectedLevel === "Debutant" && formation.level === "debutant") ||
-        (selectedLevel === "Intermediaire" && formation.level === "intermediaire") ||
+        (selectedLevel === "Intermediaire" &&
+          formation.level === "intermediaire") ||
         (selectedLevel === "Avance" && formation.level === "avance");
       const matchesFormat =
         selectedFormat === "Tous" ||
@@ -199,7 +204,8 @@ export default function FormationsPage() {
       }
 
       return (
-        new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+        new Date(b.created_at ?? 0).getTime() -
+        new Date(a.created_at ?? 0).getTime()
       );
     });
 
@@ -231,19 +237,25 @@ export default function FormationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen py-20 bg-slate-50">
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
             <div className="flex items-center gap-2 text-amber-600 mb-2">
               <Sparkles className="h-5 w-5" />
-              <span className="font-medium uppercase tracking-wider text-sm">Catalogue</span>
+              <span className="font-medium uppercase tracking-wider text-sm">
+                Catalogue
+              </span>
             </div>
             <h1 className="font-[family-name:var(--font-playfair)] text-4xl lg:text-5xl font-semibold text-slate-900">
               Nos formations
             </h1>
             <p className="text-slate-600 mt-3 max-w-2xl text-lg">
-              Retrouvez uniquement les formations publiees et accessibles au public.
+              Retrouvez uniquement les formations publiees et accessibles au
+              public.
             </p>
           </motion.div>
         </div>
@@ -262,7 +274,12 @@ export default function FormationsPage() {
           </div>
 
           <div className="w-full sm:w-60">
-            <Select value={selectedSort} onValueChange={(value) => setSelectedSort(value as typeof selectedSort)}>
+            <Select
+              value={selectedSort}
+              onValueChange={(value) =>
+                setSelectedSort(value as typeof selectedSort)
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Trier par" />
               </SelectTrigger>
@@ -289,8 +306,13 @@ export default function FormationsPage() {
               </SheetHeader>
               <div className="space-y-4 mt-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Categorie</label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <label className="text-sm font-medium mb-2 block">
+                    Categorie
+                  </label>
+                  <Select
+                    value={selectedCategory}
+                    onValueChange={setSelectedCategory}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -304,8 +326,13 @@ export default function FormationsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Niveau</label>
-                  <Select value={selectedLevel} onValueChange={setSelectedLevel}>
+                  <label className="text-sm font-medium mb-2 block">
+                    Niveau
+                  </label>
+                  <Select
+                    value={selectedLevel}
+                    onValueChange={setSelectedLevel}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -319,8 +346,13 @@ export default function FormationsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Format</label>
-                  <Select value={selectedFormat} onValueChange={setSelectedFormat}>
+                  <label className="text-sm font-medium mb-2 block">
+                    Format
+                  </label>
+                  <Select
+                    value={selectedFormat}
+                    onValueChange={setSelectedFormat}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -335,7 +367,10 @@ export default function FormationsPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Prix</label>
-                  <Select value={selectedPrice} onValueChange={setSelectedPrice}>
+                  <Select
+                    value={selectedPrice}
+                    onValueChange={setSelectedPrice}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -450,34 +485,53 @@ export default function FormationsPage() {
                 {selectedLevel !== "Tous" && (
                   <Badge variant="secondary" className="gap-1">
                     {selectedLevel}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedLevel("Tous")} />
+                    <X
+                      className="h-3 w-3 cursor-pointer"
+                      onClick={() => setSelectedLevel("Tous")}
+                    />
                   </Badge>
                 )}
                 {selectedFormat !== "Tous" && (
                   <Badge variant="secondary" className="gap-1">
                     {selectedFormat}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedFormat("Tous")} />
+                    <X
+                      className="h-3 w-3 cursor-pointer"
+                      onClick={() => setSelectedFormat("Tous")}
+                    />
                   </Badge>
                 )}
                 {selectedPrice !== "Tous" && (
                   <Badge variant="secondary" className="gap-1">
                     {selectedPrice}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedPrice("Tous")} />
+                    <X
+                      className="h-3 w-3 cursor-pointer"
+                      onClick={() => setSelectedPrice("Tous")}
+                    />
                   </Badge>
                 )}
-                <button onClick={clearFilters} className="text-sm text-amber-600 hover:text-amber-700">
+                <button
+                  onClick={clearFilters}
+                  className="text-sm text-amber-600 hover:text-amber-700"
+                >
                   Tout effacer
                 </button>
               </div>
             )}
 
             {isLoading ? (
-              <div className="text-center py-16 text-slate-500">Chargement des formations...</div>
+              <div className="text-center py-16 text-slate-500">
+                Chargement des formations...
+              </div>
             ) : fetchError ? (
               <div className="text-center py-16">
-                <h3 className="font-semibold text-slate-900 mb-2">Erreur de chargement</h3>
+                <h3 className="font-semibold text-slate-900 mb-2">
+                  Erreur de chargement
+                </h3>
                 <p className="text-slate-500 mb-4">{fetchError}</p>
-                <Button variant="outline" onClick={() => window.location.reload()}>
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.reload()}
+                >
                   Reessayer
                 </Button>
               </div>
@@ -508,8 +562,14 @@ export default function FormationsPage() {
                     <h3 className="font-[family-name:var(--font-playfair)] text-lg font-medium text-slate-900 mb-2">
                       Aucune formation trouvee
                     </h3>
-                    <p className="text-slate-500">Essayez de modifier vos filtres ou votre recherche.</p>
-                    <Button variant="outline" className="mt-4" onClick={clearFilters}>
+                    <p className="text-slate-500">
+                      Essayez de modifier vos filtres ou votre recherche.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      onClick={clearFilters}
+                    >
                       Effacer les filtres
                     </Button>
                   </div>
