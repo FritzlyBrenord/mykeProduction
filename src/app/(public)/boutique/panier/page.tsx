@@ -1,11 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useCart } from "@/lib/hooks/useCart";
 import { getPrimaryProductImage } from "@/lib/products";
+import {
+  calculateShippingQuote,
+  getShippingCountryLabel,
+  type ShippingRule,
+} from "@/lib/shipping";
 import { formatPrice } from "@/lib/utils/format";
 import { motion } from "framer-motion";
 import {
@@ -23,8 +29,9 @@ import { toast } from "sonner";
 
 function getItemTitle(item: ReturnType<typeof useCart>["items"][number]) {
   if (item.item_type === "produit") return item.produit?.name || "Produit";
-  if (item.item_type === "formation")
+  if (item.item_type === "formation") {
     return item.formation?.title || "Formation";
+  }
   return item.video?.title || "Video";
 }
 
@@ -46,15 +53,61 @@ export default function CartPage() {
   const { user } = useAuth();
   const { items, loading, removeItem, updateQuantity, clearCart } = useCart();
 
+  const [shippingRules, setShippingRules] = useState<ShippingRule[]>([]);
+  const [detectedCountry, setDetectedCountry] = useState("");
+  const [appliedCountryCode, setAppliedCountryCode] = useState("default");
+
+  useEffect(() => {
+    const fetchRules = async () => {
+      try {
+        const res = await fetch("/api/shipping", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          setShippingRules(Array.isArray(data?.rules) ? data.rules : []);
+          if (
+            typeof data?.detectedCountry === "string" &&
+            data.detectedCountry
+          ) {
+            setDetectedCountry(data.detectedCountry);
+          }
+          if (
+            typeof data?.appliedCountryCode === "string" &&
+            data.appliedCountryCode
+          ) {
+            setAppliedCountryCode(data.appliedCountryCode);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch shipping rules:", err);
+      }
+    };
+
+    void fetchRules();
+  }, []);
+
   const subtotal = items.reduce(
     (sum, item) => sum + item.unit_price * item.quantity,
     0,
   );
-  const hasPhysicalProducts = items.some(
+
+  const physicalItems = items.filter(
     (item) =>
       item.item_type === "produit" && !(item.produit?.is_digital ?? false),
   );
-  const shippingCost = hasPhysicalProducts ? (subtotal >= 100 ? 0 : 9.9) : 0;
+  const hasPhysicalProducts = physicalItems.length > 0;
+  const physicalSubtotal = physicalItems.reduce(
+    (sum, item) => sum + item.quantity * item.unit_price,
+    0,
+  );
+
+  const shippingQuote = calculateShippingQuote({
+    rules: shippingRules,
+    countryCode: detectedCountry,
+    physicalSubtotal,
+    hasPhysicalProducts,
+  });
+
+  const shippingCost = shippingQuote.shippingCost;
   const total = subtotal + shippingCost;
 
   const handleCheckout = () => {
@@ -74,7 +127,7 @@ export default function CartPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-500">
+        <div className="mx-auto max-w-6xl px-4 text-center text-slate-500 sm:px-6 lg:px-8">
           Chargement du panier...
         </div>
       </div>
@@ -83,25 +136,25 @@ export default function CartPage() {
 
   if (items.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center"
         >
-          <ShoppingCart className="h-20 w-20 text-slate-300 mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">
+          <ShoppingCart className="mx-auto mb-6 h-20 w-20 text-slate-300" />
+          <h1 className="mb-2 text-2xl font-bold text-slate-900">
             Votre panier est vide
           </h1>
-          <p className="text-slate-500 mb-6">
+          <p className="mb-6 text-slate-500">
             Ajoutez des produits, formations ou videos.
           </p>
-          <div className="flex gap-4 justify-center">
+          <div className="flex justify-center gap-4">
             <Link href="/formations">
               <Button variant="outline">Voir les formations</Button>
             </Link>
             <Link href="/boutique">
-              <Button className="bg-slate-900 hover:bg-amber-500 hover:text-slate-950">
+              <Button className="bg-slate-900 text-gray-100 hover:bg-amber-500 hover:text-slate-950">
                 Visiter la boutique
               </Button>
             </Link>
@@ -113,12 +166,12 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h1 className="text-3xl font-bold text-slate-900">
               Votre panier ({items.length} article{items.length > 1 ? "s" : ""})
             </h1>
@@ -128,8 +181,8 @@ export default function CartPage() {
           </div>
 
           {!user && (
-            <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div className="mb-6 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <p>
                 Panier en mode invite. Connectez-vous et les articles seront
                 synchronises automatiquement vers votre compte.
@@ -137,8 +190,8 @@ export default function CartPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-4">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
               {items.map((item, index) => (
                 <motion.div
                   key={item.id}
@@ -149,7 +202,7 @@ export default function CartPage() {
                   <Card>
                     <CardContent className="p-4">
                       <div className="flex gap-4">
-                        <div className="w-24 h-24 flex-shrink-0 bg-slate-100 rounded-lg overflow-hidden relative">
+                        <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
                           <Image
                             src={getItemImage(item)}
                             alt={getItemTitle(item)}
@@ -158,22 +211,22 @@ export default function CartPage() {
                           />
                         </div>
 
-                        <div className="flex-1 min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-4">
                             <div>
-                              <p className="text-sm text-slate-500 mb-1">
+                              <p className="mb-1 text-sm text-slate-500">
                                 {item.item_type === "produit"
                                   ? "Produit"
                                   : item.item_type === "formation"
                                     ? "Formation"
                                     : "Video"}
                               </p>
-                              <h3 className="font-semibold text-slate-900 line-clamp-2">
+                              <h3 className="line-clamp-2 font-semibold text-slate-900">
                                 {getItemTitle(item)}
                               </h3>
                               {item.item_type === "produit" &&
                                 item.produit?.type === "chimique" && (
-                                  <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                  <p className="mt-1 flex items-center gap-1 text-xs text-amber-600">
                                     <AlertCircle className="h-3 w-3" />
                                     Produit chimique - vente reglementee
                                   </p>
@@ -181,20 +234,20 @@ export default function CartPage() {
                             </div>
                             <button
                               onClick={() => removeItem(item.id)}
-                              className="text-slate-400 hover:text-red-500 transition-colors"
+                              className="text-slate-400 transition-colors hover:text-red-500"
                             >
                               <Trash2 className="h-5 w-5" />
                             </button>
                           </div>
 
-                          <div className="flex items-center justify-between mt-4">
+                          <div className="mt-4 flex items-center justify-between">
                             {item.item_type === "produit" ? (
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() =>
                                     updateQuantity(item.id, item.quantity - 1)
                                   }
-                                  className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-slate-50"
+                                  className="flex h-8 w-8 items-center justify-center rounded-full border hover:bg-slate-50"
                                 >
                                   <Minus className="h-4 w-4" />
                                 </button>
@@ -205,7 +258,7 @@ export default function CartPage() {
                                   onClick={() =>
                                     updateQuantity(item.id, item.quantity + 1)
                                   }
-                                  className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-slate-50"
+                                  className="flex h-8 w-8 items-center justify-center rounded-full border hover:bg-slate-50"
                                 >
                                   <Plus className="h-4 w-4" />
                                 </button>
@@ -245,7 +298,7 @@ export default function CartPage() {
               >
                 <Card>
                   <CardContent className="p-6">
-                    <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                    <h2 className="mb-4 text-lg font-semibold text-slate-900">
                       Recapitulatif
                     </h2>
                     <div className="space-y-3">
@@ -269,7 +322,7 @@ export default function CartPage() {
                     </div>
 
                     <Button
-                      className="w-full mt-6 bg-slate-900 text-gray-100 hover:bg-amber-500 hover:text-slate-950 h-12"
+                      className="mt-6 h-12 w-full bg-slate-900 text-gray-100 hover:bg-amber-500 hover:text-slate-950"
                       onClick={handleCheckout}
                     >
                       Passer a la caisse
@@ -277,12 +330,18 @@ export default function CartPage() {
                     </Button>
 
                     {hasPhysicalProducts ? (
-                      <p className="text-xs text-slate-500 text-center mt-4">
-                        Livraison gratuite a partir de {formatPrice(100, "USD")}
-                        .
-                      </p>
+                      <div className="mt-4 space-y-1 text-center text-xs text-slate-500">
+                        <p>
+                          Livraison gratuite a partir de{" "}
+                          {formatPrice(
+                            shippingQuote.rule?.free_threshold ?? 100,
+                            "USD",
+                          )}
+                          .
+                        </p>
+                      </div>
                     ) : (
-                      <p className="text-xs text-slate-500 text-center mt-4">
+                      <p className="mt-4 text-center text-xs text-slate-500">
                         Aucun frais de livraison pour les contenus numeriques.
                       </p>
                     )}

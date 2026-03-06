@@ -7,6 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useCart } from "@/lib/hooks/useCart";
+import {
+  calculateShippingQuote,
+  getShippingCountryLabel,
+  SHIPPING_COUNTRY_OPTIONS,
+  type ShippingRule,
+} from "@/lib/shipping";
 import { stripePromise } from "@/lib/stripe/client";
 import { formatPrice } from "@/lib/utils/format";
 import {
@@ -42,7 +48,11 @@ interface ShippingInfo {
   phone: string;
 }
 
-function buildOrderSummary(items: ReturnType<typeof useCart>["items"]) {
+function buildOrderSummary(
+  items: ReturnType<typeof useCart>["items"],
+  shippingRules: ShippingRule[],
+  selectedCountry: string
+) {
   const mappedItems = items.map((item) => {
     const name =
       item.item_type === "produit"
@@ -58,14 +68,34 @@ function buildOrderSummary(items: ReturnType<typeof useCart>["items"]) {
   });
 
   const subtotal = mappedItems.reduce((sum, item) => sum + item.total, 0);
-  const hasPhysicalProducts = items.some(
-    (item) =>
-      item.item_type === "produit" && !(item.produit?.is_digital ?? false),
+  
+  // Only physical products contribute to shipping calculations
+  const physicalItems = items.filter(
+    (item) => item.item_type === "produit" && !(item.produit?.is_digital ?? false)
   );
-  const shipping = hasPhysicalProducts ? (subtotal >= 100 ? 0 : 9.9) : 0;
+  
+  const hasPhysicalProducts = physicalItems.length > 0;
+  const physicalSubtotal = physicalItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+
+  const quote = calculateShippingQuote({
+    rules: shippingRules,
+    countryCode: selectedCountry,
+    physicalSubtotal,
+    hasPhysicalProducts,
+  });
+  const shipping = quote.shippingCost;
+    
   const total = subtotal + shipping;
 
-  return { items: mappedItems, subtotal, shipping, total, hasPhysicalProducts };
+  return {
+    items: mappedItems,
+    subtotal,
+    shipping,
+    total,
+    hasPhysicalProducts,
+    shippingRule: quote.rule,
+    usesFallbackRule: quote.isFallbackRule,
+  };
 }
 
 function StripePaymentForm({
@@ -207,6 +237,26 @@ export default function CheckoutPage() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [paymentInitError, setPaymentInitError] = useState<string | null>(null);
+  const [shippingRules, setShippingRules] = useState<ShippingRule[]>([]);
+  const [countryTouched, setCountryTouched] = useState(false);
+
+  useEffect(() => {
+    const fetchRules = async () => {
+      try {
+        const res = await fetch("/api/shipping", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          setShippingRules(Array.isArray(data?.rules) ? data.rules : []);
+          if (!countryTouched && typeof data?.detectedCountry === "string" && data.detectedCountry) {
+            setShippingInfo((prev) => ({ ...prev, country: data.detectedCountry }));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch shipping rules:", err);
+      }
+    };
+    void fetchRules();
+  }, [countryTouched]);
 
   const [shippingInfo, setShippingInfo] = useState<ShippingInfo>({
     firstName: "",
@@ -232,7 +282,10 @@ export default function CheckoutPage() {
     }));
   }, [user]);
 
-  const orderSummary = useMemo(() => buildOrderSummary(items), [items]);
+  const orderSummary = useMemo(
+    () => buildOrderSummary(items, shippingRules, shippingInfo.country),
+    [items, shippingRules, shippingInfo.country]
+  );
   const canCheckout = Boolean(user) && !loading && items.length > 0;
 
   const checkoutPayload = useMemo(() => {
@@ -630,19 +683,21 @@ export default function CheckoutPage() {
                           </Label>
                           <select
                             id="country"
-                            className="w-full h-10 px-3 rounded-md border border-input bg-background text-slate-900"
+                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-slate-900"
                             value={shippingInfo.country}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              setCountryTouched(true);
                               setShippingInfo({
                                 ...shippingInfo,
                                 country: e.target.value,
-                              })
-                            }
+                              });
+                            }}
                           >
-                            <option value="US">United States</option>
-                            <option value="CA">Canada</option>
-                            <option value="HT">Haiti</option>
-                            <option value="FR">France</option>
+                            {SHIPPING_COUNTRY_OPTIONS.filter((option) => option.code !== "default").map((option) => (
+                              <option key={option.code} value={option.code}>
+                                {option.label}
+                              </option>
+                            ))}
                           </select>
                         </div>
                         <div>
@@ -787,6 +842,16 @@ export default function CheckoutPage() {
                       <span>Total</span>
                       <span>{formatPrice(orderSummary.total, "USD")}</span>
                     </div>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-xs text-slate-500">
+                    <p>Pays applique: {getShippingCountryLabel(shippingInfo.country)}</p>
+                    {orderSummary.shippingRule ? (
+                      <p>
+                        Regle: {orderSummary.shippingRule.country_name}
+                        {orderSummary.usesFallbackRule ? " (repli global)" : ""}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="mt-6 pt-6 border-t">

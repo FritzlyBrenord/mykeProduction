@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,7 +17,6 @@ import {
   PlayCircle,
   LogOut,
   ChevronRight,
-  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useCart } from "@/lib/hooks/useCart";
@@ -78,9 +78,6 @@ export default function Navbar() {
   const textMutedHoverClass = isLightMode
     ? "hover:text-amber-600"
     : "hover:text-white";
-  const logoSubtitleClass = isLightMode
-    ? "text-amber-600"
-    : "text-amber-400/80";
   const handleSignOut = async () => {
     if (isSigningOut) return;
     setIsSigningOut(true);
@@ -114,23 +111,14 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-20 lg:h-24">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative">
-              <div className="w-12 h-12 rounded-sm bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20 group-hover:shadow-amber-500/40 transition-all">
-                <Sparkles className="h-6 w-6 text-slate-950" />
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-3 h-3 border-r-2 border-b-2 border-amber-400/60" />
-            </div>
-            <div className="flex flex-col">
-              <span
-                className={`font-[family-name:var(--font-playfair)] font-semibold text-xl tracking-tight transition-colors ${textColorClass}`}
-              >
-                Myke Industrie
-              </span>
-              <span
-                className={`text-[10px] uppercase tracking-[0.2em] -mt-0.5 transition-colors ${logoSubtitleClass}`}
-              >
-                Excellence Industrielle
-              </span>
+            <div className="relative h-12 w-[150px] transition-transform duration-300 group-hover:scale-[1.02] sm:h-14 sm:w-[175px]">
+              <Image
+                src="/logo2.png"
+                alt="Myke Industrie"
+                fill
+                priority
+                className="object-contain object-left"
+              />
             </div>
           </Link>
 

@@ -354,21 +354,22 @@ export default function OrdersPage() {
                           )}
                         </p>
                         <Link href={`/compte/commandes/${order.id}`}>
-                          <Button variant="outline">
+                          <Button variant="outline" className="text-gray-600">
                             <Package className="h-4 w-4 mr-2" />
                             Suivre
                           </Button>
                         </Link>
+
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="outline">
+                            <Button variant="outline" className="text-gray-600">
                               <Eye className="h-4 w-4 mr-2" />
                               Details
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-3xl">
+                          <DialogContent className="max-w-3xl bg-gray-500">
                             <DialogHeader>
-                              <DialogTitle>
+                              <DialogTitle className="text-gray-100">
                                 Suivi commande {shortOrderId(order.id)}
                               </DialogTitle>
                             </DialogHeader>

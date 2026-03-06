@@ -1,4 +1,8 @@
-import { sendOrderAuthorizedEmail } from '@/lib/email/orders';
+import {
+  sendOrderAuthorizedEmail,
+  sendOrderDeliveredEmail,
+  sendOrderShippedEmail,
+} from '@/lib/email/orders';
 import {
   appendTrackingEvent,
   canTransitionOrderItemStatus,
@@ -388,11 +392,11 @@ export async function PATCH(
       updated_at: nowIso,
       tracking_timeline: statusHasChanged
         ? appendTrackingEvent(order.tracking_timeline, {
-            status: nextOrderStatus,
-            at: nowIso,
-            label: orderStatusLabel(nextOrderStatus),
-            note: trackingNote,
-          })
+          status: nextOrderStatus,
+          at: nowIso,
+          label: orderStatusLabel(nextOrderStatus),
+          note: trackingNote,
+        })
         : order.tracking_timeline,
     };
 
@@ -412,6 +416,36 @@ export async function PATCH(
       }
       if ((nextOrderStatus === 'cancelled' || nextOrderStatus === 'refunded') && !order.cancelled_at) {
         orderUpdatePayload.cancelled_at = nowIso;
+      }
+
+      // Trigger status-based emails
+      try {
+        const customerEmail = shippingField(order.shipping_address, 'email');
+        let emailTo = customerEmail;
+
+        // If we don't have an email in metadata, try to get it from the user profile
+        if (!emailTo) {
+          const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(order.user_id);
+          emailTo = authUser?.user?.email ?? '';
+        }
+
+        if (emailTo) {
+          if (nextOrderStatus === 'shipped') {
+            await sendOrderShippedEmail({
+              to: emailTo,
+              customerName: customerDisplayName(order),
+              orderId: order.id,
+            });
+          } else if (nextOrderStatus === 'delivered') {
+            await sendOrderDeliveredEmail({
+              to: emailTo,
+              customerName: customerDisplayName(order),
+              orderId: order.id,
+            });
+          }
+        }
+      } catch (emailError) {
+        console.error('Order status notification email error:', emailError);
       }
     }
 

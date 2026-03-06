@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -84,15 +85,33 @@ const navItems: NavItem[] = [
     href: "/admin/paiements",
     icon: CreditCard,
   },
+  {
+    label: "Paramètres",
+    href: "/admin/settings",
+    icon: Settings,
+    children: [
+      { label: "Livraison", href: "/admin/settings/shipping" },
+    ],
+  },
 ];
 
 function NavItemComponent({ item }: { item: NavItem }) {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
   const { isCollapsed } = useSidebar();
-  const isActive =
-    pathname === item.href || pathname.startsWith(item.href + "/");
+  
+  const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
   const hasChildren = item.children && item.children.length > 0;
+  
+  // Auto-open if child is active
+  const isChildActive = item.children?.some(child => pathname === child.href);
+  const [isOpen, setIsOpen] = useState(isChildActive || false);
+
+  // Update isOpen when pathname changes if a child becomes active
+  useEffect(() => {
+    if (isChildActive) {
+      setIsOpen(true);
+    }
+  }, [pathname, isChildActive]);
 
   if (isCollapsed) {
     return (
@@ -219,11 +238,17 @@ export default function AdminSidebar() {
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[var(--card)] border-b border-[var(--border)] z-50 px-4 flex items-center justify-between">
         <Link href="/admin/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[var(--primary)] rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-lg">M</span>
+          <div className="relative h-10 w-10 overflow-hidden rounded-xl bg-white">
+            <Image
+              src="/logo2.png"
+              alt="Myke Industrie"
+              fill
+              priority
+              className="object-contain p-1"
+            />
           </div>
           <span className="font-bold text-xl text-[var(--foreground)]">
-            Myke Admin
+            Admin
           </span>
         </Link>
         <button
@@ -258,8 +283,14 @@ export default function AdminSidebar() {
         {/* Logo */}
         <div className="h-20 flex items-center px-4 border-b border-[var(--border)]">
           <Link href="/admin/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[var(--primary)] rounded-xl flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-lg">M</span>
+            <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl bg-white">
+              <Image
+                src="/logo2.png"
+                alt="Myke Industrie"
+                fill
+                priority
+                className="object-contain p-1"
+              />
             </div>
             {!isCollapsed && (
               <motion.span
@@ -268,7 +299,7 @@ export default function AdminSidebar() {
                 exit={{ opacity: 0 }}
                 className="font-bold text-xl text-[var(--foreground)] whitespace-nowrap"
               >
-                Myke Admin
+                Admin
               </motion.span>
             )}
           </Link>

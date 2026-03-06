@@ -313,7 +313,7 @@ export default function FormationDetailPage() {
                         </Button>
                       ) : (
                         <Button
-                          className="w-full bg-slate-900 hover:bg-amber-500 hover:text-slate-950 h-12 text-lg"
+                          className="w-full bg-slate-900 text-gray-200 hover:bg-amber-500 hover:text-slate-950 h-12 text-lg"
                           onClick={handleAddToCart}
                           disabled={isAddingToCart}
                         >

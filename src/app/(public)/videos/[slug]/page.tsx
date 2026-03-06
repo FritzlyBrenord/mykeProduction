@@ -609,11 +609,6 @@ export default function VideoDetailPage() {
               <span className="text-xs text-slate-500">
                 {formatDate(commentItem.created_at)}
               </span>
-              {commentItem.status !== "approved" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-400 border border-amber-500/20">
-                  En attente
-                </span>
-              )}
             </div>
 
             <p className="mb-3 text-sm leading-6 text-slate-300">
@@ -1208,42 +1203,107 @@ export default function VideoDetailPage() {
                 Aucune vidéo similaire disponible.
               </p>
             ) : (
-              <div className="space-y-3">
-                {related.map((item, index) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 + index * 0.1 }}
-                  >
-                    <Link
-                      href={`/videos/${item.slug}`}
-                      className="group flex gap-3 rounded-xl border border-slate-700/30 bg-slate-800/20 p-2 transition-all hover:border-red-500/30 hover:bg-slate-800/40"
+              <div className="space-y-4">
+                {related.map((item, index) => {
+                  const relYtId = item.video_url ? extractYouTubeId(item.video_url) : null;
+                  const relVimeoId = item.video_url ? extractVimeoId(item.video_url) : null;
+                  const hasEmbed = Boolean(
+                    (item.video_type === "youtube" && relYtId) ||
+                    (item.video_type === "vimeo" && relVimeoId),
+                  );
+
+                  return (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + index * 0.1 }}
+                      className="group/card"
                     >
-                      <div className="relative h-20 w-32 flex-shrink-0 overflow-hidden rounded-lg bg-slate-800">
-                        <Image
-                          src={
-                            item.thumbnail_url ||
-                            "/images/placeholder-video.svg"
-                          }
-                          alt={item.title}
-                          fill
-                          className="object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 to-transparent" />
+                      {/* Preview area (shows on hover) */}
+                      <div className="relative overflow-hidden rounded-xl border border-slate-700/30 bg-slate-900 transition-all duration-300 group-hover/card:border-red-500/40 group-hover/card:shadow-lg group-hover/card:shadow-red-500/10">
+                        {/* Thumbnail (always visible) */}
+                        <div className="relative aspect-video w-full overflow-hidden">
+                          <Image
+                            src={item.thumbnail_url || "/images/placeholder-video.svg"}
+                            alt={item.title}
+                            fill
+                            sizes="(max-width: 768px) 100vw, 380px"
+                            className="object-cover transition-all duration-500 group-hover/card:scale-105 group-hover/card:opacity-0"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent transition-opacity duration-300 group-hover/card:opacity-0" />
+
+                          {/* Play overlay (visible when NOT hovering) */}
+                          <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 group-hover/card:opacity-0">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm ring-1 ring-white/20 transition-transform duration-200 group-hover/card:scale-110">
+                              <Play className="h-5 w-5 translate-x-0.5 text-white" />
+                            </div>
+                          </div>
+
+                          {/* Embed preview (visible on hover) */}
+                          {hasEmbed && (
+                            <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/card:opacity-100">
+                              {item.video_type === "youtube" && relYtId ? (
+                                <iframe
+                                  src={`https://www.youtube.com/embed/${relYtId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&loop=1&playlist=${relYtId}`}
+                                  title={`Aperçu — ${item.title}`}
+                                  className="h-full w-full"
+                                  allow="autoplay; encrypted-media"
+                                  loading="lazy"
+                                />
+                              ) : item.video_type === "vimeo" && relVimeoId ? (
+                                <iframe
+                                  src={`https://player.vimeo.com/video/${relVimeoId}?autoplay=1&muted=1&controls=0&loop=1&background=1`}
+                                  title={`Aperçu — ${item.title}`}
+                                  className="h-full w-full"
+                                  allow="autoplay; fullscreen"
+                                  loading="lazy"
+                                />
+                              ) : null}
+                            </div>
+                          )}
+
+                          {/* "Aperçu" badge */}
+                          {hasEmbed && (
+                            <div className="absolute top-2 right-2 translate-y-1 opacity-0 transition-all duration-300 group-hover/card:translate-y-0 group-hover/card:opacity-100">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
+                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                                Aperçu
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Access badge */}
+                          {item.access_type === "paid" && (
+                            <div className="absolute top-2 left-2">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-900/80 px-2 py-0.5 text-[10px] font-semibold text-red-400 backdrop-blur-sm ring-1 ring-red-500/30">
+                                <Lock className="h-2.5 w-2.5" />
+                                Payant
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Info row */}
+                        <Link
+                          href={`/videos/${item.slug}`}
+                          className="flex items-center gap-2 px-3 py-2.5 transition-colors hover:bg-slate-800/40"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="line-clamp-1 text-sm font-semibold text-slate-200 transition-colors group-hover/card:text-red-400">
+                              {item.title}
+                            </p>
+                            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                              <Eye className="h-3 w-3" />
+                              {compact(Number(item.view_count || 0))} vues
+                            </p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-600 transition-transform group-hover/card:translate-x-0.5 group-hover/card:text-red-400" />
+                        </Link>
                       </div>
-                      <div className="min-w-0 flex-1 py-1">
-                        <p className="line-clamp-2 text-sm font-medium text-slate-200 transition-colors group-hover:text-red-400">
-                          {item.title}
-                        </p>
-                        <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
-                          <Eye className="h-3 w-3" />
-                          {compact(Number(item.view_count || 0))} vues
-                        </p>
-                      </div>
-                    </Link>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
           </motion.div>

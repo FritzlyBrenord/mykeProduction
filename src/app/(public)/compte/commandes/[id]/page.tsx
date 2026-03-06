@@ -238,7 +238,7 @@ export default function OrderTrackingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-20">
+    <div className="min-h-screen bg-slate-50 py-40">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 space-y-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <Link
@@ -254,6 +254,7 @@ export default function OrderTrackingPage() {
               size="sm"
               onClick={() => void fetchOrder(true)}
               disabled={refreshing}
+              className="text-gray-700"
             >
               <RefreshCw
                 className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`}

@@ -1,6 +1,13 @@
 import { getStripeServerClient, toStripeAmount } from '@/lib/stripe/server';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import {
+  calculateShippingQuote,
+  detectCountryCode,
+  normalizeCountryCode,
+  sortShippingRules,
+  type ShippingRule,
+} from '@/lib/shipping';
 import { NextRequest, NextResponse } from 'next/server';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -98,7 +105,7 @@ function parseBody(payload: unknown) {
     address: normalizeText(shippingRaw.address, 200),
     city: normalizeText(shippingRaw.city, 120),
     postal_code: normalizeText(shippingRaw.postal_code ?? shippingRaw.postalCode, 24),
-    country: normalizeText(shippingRaw.country, 80),
+    country: normalizeCountryCode(shippingRaw.country),
     phone: normalizeText(shippingRaw.phone, 40) || null,
   };
 
@@ -266,13 +273,13 @@ async function buildCartItemsFromClientPayload(
         video_id: null,
         produit: product
           ? {
-              id: product.id,
-              name: product.name,
-              slug: product.slug,
-              is_digital: product.is_digital,
-              status: product.status,
-              stock: product.stock,
-            }
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            is_digital: product.is_digital,
+            status: product.status,
+            stock: product.stock,
+          }
           : null,
         formation: null,
         video: null,
@@ -292,12 +299,12 @@ async function buildCartItemsFromClientPayload(
         produit: null,
         formation: formation
           ? {
-              id: formation.id,
-              title: formation.title,
-              slug: formation.slug,
-              status: formation.status,
-              is_free: formation.is_free,
-            }
+            id: formation.id,
+            title: formation.title,
+            slug: formation.slug,
+            status: formation.status,
+            is_free: formation.is_free,
+          }
           : null,
         video: null,
       } satisfies CheckoutCartItemRow;
@@ -316,11 +323,11 @@ async function buildCartItemsFromClientPayload(
       formation: null,
       video: video
         ? {
-            id: video.id,
-            title: video.title,
-            slug: video.slug,
-            status: video.status,
-          }
+          id: video.id,
+          title: video.title,
+          slug: video.slug,
+          status: video.status,
+        }
         : null,
     } satisfies CheckoutCartItemRow;
   });
@@ -346,6 +353,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { paymentMethod, shipping, cartItems: clientCartItems } = parseBody(body);
+    shipping.country =
+      shipping.country || detectCountryCode(request.headers) || '';
     if (paymentMethod !== 'card') {
       return NextResponse.json(
         { error: 'Seul le paiement par carte est actuellement disponible.' },
@@ -494,7 +503,42 @@ export async function POST(request: NextRequest) {
       (sum, item) => sum + Number(item.unit_price || 0) * Math.max(1, Number(item.quantity || 1)),
       0,
     );
-    const shippingCost = hasPhysicalProducts ? (subtotal >= 100 ? 0 : 9.9) : 0;
+
+    // Dynamic Shipping Calculation
+    let shippingCost = 0;
+    let appliedShippingRule: { country_code: string; country_name: string } | null = null;
+    if (hasPhysicalProducts) {
+      const physicalSubtotal = cartItems
+        .filter(item => item.item_type === 'produit' && !getSingleRelation(item.produit)?.is_digital)
+        .reduce((sum, item) => sum + Number(item.unit_price || 0) * Math.max(1, Number(item.quantity || 1)), 0);
+
+      const { data: rules } = await supabaseAdmin
+        .from('shipping_settings')
+        .select('country_code, country_name, base_fee, free_threshold, priority, is_active, created_at, updated_at');
+
+      const quote = calculateShippingQuote({
+        rules: sortShippingRules((rules ?? []) as ShippingRule[]),
+        countryCode: shipping.country,
+        physicalSubtotal,
+        hasPhysicalProducts,
+      });
+
+      if (!quote.rule) {
+        return NextResponse.json(
+          { error: 'Aucune regle de livraison active ne correspond a ce pays. Activez la regle par defaut.' },
+          { status: 400 },
+        );
+      }
+
+      shippingCost = quote.shippingCost;
+      appliedShippingRule = quote.rule
+        ? {
+            country_code: quote.rule.country_code,
+            country_name: quote.rule.country_name,
+          }
+        : null;
+    }
+
     const discountAmount = 0;
     const taxAmount = 0;
     const totalAmount = Math.max(0, subtotal + shippingCost + taxAmount - discountAmount);
@@ -521,6 +565,7 @@ export async function POST(request: NextRequest) {
           ...shipping,
           shipping_cost: shippingCost,
           has_physical_products: hasPhysicalProducts,
+          applied_shipping_rule: appliedShippingRule,
         },
         payment_method: 'stripe',
         estimated_delivery_at: null,
@@ -556,24 +601,24 @@ export async function POST(request: NextRequest) {
     }
 
     const orderItemsPayload = cartItems.map((item) => ({
-        commande_id: order.id,
-        item_type: item.item_type,
-        produit_id: item.item_type === 'produit' ? item.produit_id : null,
-        formation_id: item.item_type === 'formation' ? item.formation_id : null,
-        video_id: item.item_type === 'video' ? item.video_id : null,
-        quantity: Math.max(1, Number(item.quantity || 1)),
-        unit_price: Number(item.unit_price || 0),
-        total_price: Number(item.unit_price || 0) * Math.max(1, Number(item.quantity || 1)),
-        item_status: 'paid',
-        authorized_at: null,
-        processing_at: null,
-        shipped_at: null,
-        delivered_at: null,
-        cancelled_at: null,
-        tracking_timeline: [],
-        created_at: nowIso,
-        updated_at: nowIso,
-      }));
+      commande_id: order.id,
+      item_type: item.item_type,
+      produit_id: item.item_type === 'produit' ? item.produit_id : null,
+      formation_id: item.item_type === 'formation' ? item.formation_id : null,
+      video_id: item.item_type === 'video' ? item.video_id : null,
+      quantity: Math.max(1, Number(item.quantity || 1)),
+      unit_price: Number(item.unit_price || 0),
+      total_price: Number(item.unit_price || 0) * Math.max(1, Number(item.quantity || 1)),
+      item_status: 'paid',
+      authorized_at: null,
+      processing_at: null,
+      shipped_at: null,
+      delivered_at: null,
+      cancelled_at: null,
+      tracking_timeline: [],
+      created_at: nowIso,
+      updated_at: nowIso,
+    }));
 
     const { error: orderItemsError } = await (supabaseAdmin
       .from('commande_items') as any)
