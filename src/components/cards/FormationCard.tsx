@@ -139,7 +139,7 @@ export default function FormationCard({
           </p>
 
           <Link href={destinationHref}>
-            <Button className="w-full bg-slate-900 transition-all duration-300 group/btn hover:bg-amber-500 hover:text-slate-950">
+            <Button className="w-full bg-slate-900 text-gray-200 transition-all duration-300 group/btn hover:bg-amber-500 hover:text-slate-950">
               {isPurchased
                 ? "Acceder a la formation"
                 : formation.is_free

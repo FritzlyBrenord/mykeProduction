@@ -80,7 +80,8 @@ async function resolvePostLoginPath(nextPath: string | null) {
   const metadataRole =
     (user.app_metadata?.role as "admin" | "client" | undefined) ??
     (user.user_metadata?.role as "admin" | "client" | undefined);
-  const role = profile?.role === "admin" || metadataRole === "admin" ? "admin" : "client";
+  const role =
+    profile?.role === "admin" || metadataRole === "admin" ? "admin" : "client";
 
   if (role === "admin") {
     if (safeNextPath?.startsWith("/admin")) {
@@ -103,8 +104,12 @@ function LoginPageContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
-  const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
-  const [verificationExpiresAtMs, setVerificationExpiresAtMs] = useState<number | null>(null);
+  const [verificationEmail, setVerificationEmail] = useState<string | null>(
+    null,
+  );
+  const [verificationExpiresAtMs, setVerificationExpiresAtMs] = useState<
+    number | null
+  >(null);
   const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0);
   const [nowMs, setNowMs] = useState(Date.now());
@@ -124,9 +129,13 @@ function LoginPageContent() {
   const blockedParam = searchParams.get("blocked");
 
   const normalizedEmail = useMemo(() => normalizeEmail(email), [email]);
-  const lockoutRemainingMs = normalizedEmail ? getLoginLockRemainingMs(normalizedEmail) : 0;
+  const lockoutRemainingMs = normalizedEmail
+    ? getLoginLockRemainingMs(normalizedEmail)
+    : 0;
   const verificationRemainingMs =
-    typeof verificationExpiresAtMs === "number" ? verificationExpiresAtMs - nowMs : null;
+    typeof verificationExpiresAtMs === "number"
+      ? verificationExpiresAtMs - nowMs
+      : null;
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -148,7 +157,9 @@ function LoginPageContent() {
 
   useEffect(() => {
     if (blockedParam === "1") {
-      setAuthErrorMessage("Ce compte est desactive. Contactez un administrateur.");
+      setAuthErrorMessage(
+        "Ce compte est desactive. Contactez un administrateur.",
+      );
     }
   }, [blockedParam]);
 
@@ -176,7 +187,9 @@ function LoginPageContent() {
           const emailToVerify = normalizedEmail;
           setVerificationEmail(emailToVerify);
           setVerificationExpiresAtMs(
-            result.verificationExpiresAtMs ?? getVerificationExpiryMs(emailToVerify) ?? null,
+            result.verificationExpiresAtMs ??
+              getVerificationExpiryMs(emailToVerify) ??
+              null,
           );
           setAuthErrorMessage(
             "Votre email n'est pas verifie. Cliquez sur le lien recu par email avant de vous connecter.",
@@ -198,11 +211,14 @@ function LoginPageContent() {
           toast.error("Identifiants invalides.");
         } else if (result.code === "ACCOUNT_BLOCKED") {
           setAuthErrorMessage(
-            result.message || "Ce compte est desactive. Contactez un administrateur.",
+            result.message ||
+              "Ce compte est desactive. Contactez un administrateur.",
           );
           toast.error("Compte desactive.");
         } else {
-          setAuthErrorMessage(result.message || "Connexion indisponible pour le moment.");
+          setAuthErrorMessage(
+            result.message || "Connexion indisponible pour le moment.",
+          );
           toast.error(result.message || "Erreur de connexion.");
         }
       } else {
@@ -212,7 +228,9 @@ function LoginPageContent() {
 
         const { target, blocked } = await resolvePostLoginPath(nextPath);
         if (blocked) {
-          setAuthErrorMessage("Ce compte est desactive. Contactez un administrateur.");
+          setAuthErrorMessage(
+            "Ce compte est desactive. Contactez un administrateur.",
+          );
           toast.error("Compte desactive.");
           router.replace(target);
           return;
@@ -245,7 +263,11 @@ function LoginPageContent() {
   };
 
   const handleResendVerification = async () => {
-    if (!verificationEmail || isResendingVerification || resendCooldownSeconds > 0) {
+    if (
+      !verificationEmail ||
+      isResendingVerification ||
+      resendCooldownSeconds > 0
+    ) {
       return;
     }
 
@@ -383,7 +405,9 @@ function LoginPageContent() {
             </p>
           </div>
 
-          {(authErrorMessage || lockoutRemainingMs > 0 || verificationEmail) && (
+          {(authErrorMessage ||
+            lockoutRemainingMs > 0 ||
+            verificationEmail) && (
             <div className="space-y-3 mb-5">
               {authErrorMessage && (
                 <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 flex gap-2">
@@ -396,8 +420,9 @@ function LoginPageContent() {
                 <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 flex gap-2">
                   <Clock3 className="h-4 w-4 mt-0.5 shrink-0" />
                   <p>
-                    Connexion bloquee pendant 20 minutes apres 5 echecs.
-                    Temps restant: <strong>{formatDuration(lockoutRemainingMs)}</strong>
+                    Connexion bloquee pendant 20 minutes apres 5 echecs. Temps
+                    restant:{" "}
+                    <strong>{formatDuration(lockoutRemainingMs)}</strong>
                   </p>
                 </div>
               )}
@@ -413,7 +438,9 @@ function LoginPageContent() {
                       variant="outline"
                       size="sm"
                       onClick={handleResendVerification}
-                      disabled={isResendingVerification || resendCooldownSeconds > 0}
+                      disabled={
+                        isResendingVerification || resendCooldownSeconds > 0
+                      }
                       className="border-amber-300 bg-white hover:bg-amber-100 text-amber-900"
                     >
                       {isResendingVerification ? (
@@ -555,7 +582,7 @@ function LoginPageContent() {
             <Button
               type="submit"
               disabled={isLoading || lockoutRemainingMs > 0}
-              className="w-full h-12 bg-slate-900 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 text-base font-medium disabled:opacity-60"
+              className="w-full h-12 bg-slate-900 text-gray-200 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 text-base font-medium disabled:opacity-60"
             >
               {isLoading ? (
                 <div className="flex items-center gap-2">

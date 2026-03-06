@@ -46,7 +46,9 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
-  const [verificationExpiresAtMs, setVerificationExpiresAtMs] = useState<number | null>(null);
+  const [verificationExpiresAtMs, setVerificationExpiresAtMs] = useState<
+    number | null
+  >(null);
   const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
   const {
     user,
@@ -87,7 +89,8 @@ export default function RegisterPage() {
     }
 
     if (!passwordValidation.valid) {
-      const message = "Le mot de passe ne respecte pas les criteres de securite.";
+      const message =
+        "Le mot de passe ne respecte pas les criteres de securite.";
       setAuthErrorMessage(message);
       toast.error(message);
       return;
@@ -96,19 +99,26 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const result = await signUp(email.trim().toLowerCase(), password, fullName);
+      const result = await signUp(
+        email.trim().toLowerCase(),
+        password,
+        fullName,
+      );
 
       if (result.error) {
         if (result.emailExists || result.code === "EMAIL_EXISTS") {
-          const message = "Cet email est deja utilise. Connectez-vous ou reinitialisez votre mot de passe.";
+          const message =
+            "Cet email est deja utilise. Connectez-vous ou reinitialisez votre mot de passe.";
           setAuthErrorMessage(message);
           toast.error(message);
         } else if (result.emailRateLimit || result.code === "RATE_LIMITED") {
-          const message = "Trop de tentatives. Reessayez dans quelques minutes.";
+          const message =
+            "Trop de tentatives. Reessayez dans quelques minutes.";
           setAuthErrorMessage(message);
           toast.error(message);
         } else {
-          const message = result.error.message || "Inscription impossible pour le moment.";
+          const message =
+            result.error.message || "Inscription impossible pour le moment.";
           setAuthErrorMessage(message);
           toast.error(message);
         }
@@ -200,7 +210,9 @@ export default function RegisterPage() {
                 <div className="w-10 h-10 rounded-lg bg-amber-400/10 flex items-center justify-center">
                   <CheckCircle className="h-5 w-5 text-amber-400" />
                 </div>
-                <span className="text-sm">Acces gratuit aux ressources de base</span>
+                <span className="text-sm">
+                  Acces gratuit aux ressources de base
+                </span>
               </div>
               <div className="flex items-center gap-3 text-slate-300">
                 <div className="w-10 h-10 rounded-lg bg-amber-400/10 flex items-center justify-center">
@@ -212,7 +224,9 @@ export default function RegisterPage() {
                 <div className="w-10 h-10 rounded-lg bg-amber-400/10 flex items-center justify-center">
                   <Award className="h-5 w-5 text-amber-400" />
                 </div>
-                <span className="text-sm">Communaute professionnelle active</span>
+                <span className="text-sm">
+                  Communaute professionnelle active
+                </span>
               </div>
             </motion.div>
           </div>
@@ -404,7 +418,10 @@ export default function RegisterPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-slate-700 font-medium">
+              <Label
+                htmlFor="confirmPassword"
+                className="text-slate-700 font-medium"
+              >
                 Confirmer le mot de passe
               </Label>
               <div className="relative group">
@@ -425,10 +442,15 @@ export default function RegisterPage() {
               <Checkbox
                 id="terms"
                 checked={acceptTerms}
-                onCheckedChange={(checked) => setAcceptTerms(checked as boolean)}
+                onCheckedChange={(checked) =>
+                  setAcceptTerms(checked as boolean)
+                }
                 className="mt-0.5 border border-gray-700 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
               />
-              <Label htmlFor="terms" className="text-sm font-normal leading-tight text-slate-600">
+              <Label
+                htmlFor="terms"
+                className="text-sm font-normal leading-tight text-slate-600"
+              >
                 J&apos;accepte les{" "}
                 <Link
                   href="/legal/cgu"
@@ -449,7 +471,7 @@ export default function RegisterPage() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-12 bg-slate-900 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 text-base font-medium"
+              className="w-full h-12 text-gray-200 bg-slate-900 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 text-base font-medium"
             >
               {isLoading ? (
                 <div className="flex items-center gap-2">

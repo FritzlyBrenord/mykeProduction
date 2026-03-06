@@ -653,28 +653,6 @@ export default function BoutiqueProductDetailPage() {
                 )}
               </div>
             )}
-
-            {/* Document Download */}
-            {produit.type === "document" && produit.file_url && (
-              <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-6">
-                <h3 className="font-semibold text-cyan-900 mb-2">
-                  Document numérique
-                </h3>
-                <p className="text-sm text-cyan-700 mb-4">
-                  Ce document sera disponible en téléchargement immédiatement
-                  après validation du paiement.
-                </p>
-                <a
-                  href={produit.file_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-cyan-800 hover:text-cyan-900 underline"
-                >
-                  <FileText className="h-4 w-4" />
-                  Voir l&apos;aperçu
-                </a>
-              </div>
-            )}
           </div>
 
           {/* Sidebar */}

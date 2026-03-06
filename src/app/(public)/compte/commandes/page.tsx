@@ -169,6 +169,11 @@ function itemStatusClass(status: string) {
   return 'bg-slate-100 text-slate-700 border-slate-200';
 }
 
+function paymentMethodLabel(method: string | null | undefined) {
+  if (method === 'paypal') return 'Paiement en ligne';
+  return 'Carte';
+}
+
 function formationProgressLabel(
   authorized: boolean | null | undefined,
   progress: number | null | undefined,
@@ -406,7 +411,7 @@ export default function OrdersPage() {
                                 <div className="flex justify-between text-sm text-slate-700">
                                   <span>Paiement</span>
                                   <span className="capitalize">
-                                    {(order.payment?.provider || order.payment_method || 'N/A')} -{' '}
+                                    {paymentMethodLabel(order.payment?.provider || order.payment_method)} -{' '}
                                     {(order.payment?.status || 'pending')}
                                   </span>
                                 </div>

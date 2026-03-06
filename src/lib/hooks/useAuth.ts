@@ -464,22 +464,36 @@ export function AuthProvider({ children, initialUser = null }: AuthProviderProps
   }, [supabase]);
 
   useEffect(() => {
-    fetchUser();
+    void fetchUser();
 
     if (!supabase) return;
+    let callbackTimer: ReturnType<typeof setTimeout> | null = null;
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        fetchUser();
+        if (callbackTimer) {
+          clearTimeout(callbackTimer);
+        }
+        // Supabase auth callback can run under an internal lock: defer auth reads
+        // to the next tick to avoid navigator lock timeouts.
+        callbackTimer = setTimeout(() => {
+          void fetchUser();
+          callbackTimer = null;
+        }, 0);
       } else {
         setUser(null);
         setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      if (callbackTimer) {
+        clearTimeout(callbackTimer);
+      }
+      subscription.unsubscribe();
+    };
   }, [supabase, fetchUser]);
 
   const signIn = async (email: string, password: string): Promise<SignInResult> => {

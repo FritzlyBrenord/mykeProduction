@@ -1,5 +1,4 @@
-import { sendOrderCreatedEmail } from '@/lib/email/orders';
-import { appendTrackingEvent } from '@/lib/orders/tracking';
+import { getStripeServerClient, toStripeAmount } from '@/lib/stripe/server';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { NextRequest, NextResponse } from 'next/server';
@@ -8,7 +7,6 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type CartItemType = 'produit' | 'formation' | 'video';
 type PaymentInputMethod = 'card' | 'paypal';
-type PaymentProvider = 'stripe' | 'paypal';
 
 interface CheckoutCartItemRow {
   id: string;
@@ -153,63 +151,6 @@ function getItemName(item: CheckoutCartItemRow) {
   if (item.item_type === 'produit') return getSingleRelation(item.produit)?.name ?? 'Produit';
   if (item.item_type === 'formation') return getSingleRelation(item.formation)?.title ?? 'Formation';
   return getSingleRelation(item.video)?.title ?? 'Video';
-}
-
-function getPaymentProvider(method: PaymentInputMethod): PaymentProvider {
-  return method === 'paypal' ? 'paypal' : 'stripe';
-}
-
-function buildInitialItemWorkflow(item: CheckoutCartItemRow, nowIso: string) {
-  const paidTimeline = appendTrackingEvent([], {
-    status: 'paid',
-    at: nowIso,
-    label: 'Paiement valide',
-  });
-
-  if (item.item_type === 'formation') {
-    return {
-      item_status: 'paid',
-      authorized_at: null,
-      processing_at: null,
-      shipped_at: null,
-      delivered_at: null,
-      cancelled_at: null,
-      tracking_timeline: appendTrackingEvent(paidTimeline, {
-        status: 'paid',
-        at: nowIso,
-        label: 'En attente d autorisation formation',
-      }),
-    };
-  }
-
-  if (
-    item.item_type === 'video' ||
-    (item.item_type === 'produit' && getSingleRelation(item.produit)?.is_digital)
-  ) {
-    return {
-      item_status: 'delivered',
-      authorized_at: null,
-      processing_at: null,
-      shipped_at: null,
-      delivered_at: nowIso,
-      cancelled_at: null,
-      tracking_timeline: appendTrackingEvent(paidTimeline, {
-        status: 'delivered',
-        at: nowIso,
-        label: 'Livre automatiquement (numerique)',
-      }),
-    };
-  }
-
-  return {
-    item_status: 'paid',
-    authorized_at: null,
-    processing_at: null,
-    shipped_at: null,
-    delivered_at: null,
-    cancelled_at: null,
-    tracking_timeline: paidTimeline,
-  };
 }
 
 async function buildCartItemsFromClientPayload(
@@ -405,18 +346,25 @@ export async function POST(request: NextRequest) {
     }
 
     const { paymentMethod, shipping, cartItems: clientCartItems } = parseBody(body);
+    if (paymentMethod !== 'card') {
+      return NextResponse.json(
+        { error: 'Seul le paiement par carte est actuellement disponible.' },
+        { status: 400 },
+      );
+    }
 
-    const { data: userCart, error: cartError } = await supabaseAdmin
+    const { data: userCarts, error: cartError } = await supabaseAdmin
       .from('carts')
-      .select('id')
+      .select('id,created_at')
       .eq('user_id', user.id)
-      .maybeSingle();
+      .order('created_at', { ascending: true })
+      .limit(10);
 
     if (cartError) {
       throw cartError;
     }
 
-    let userCartId = userCart?.id ?? null;
+    let userCartId = (userCarts ?? [])[0]?.id ?? null;
     if (!userCartId) {
       const { data: createdCart, error: createCartError } = await (supabaseAdmin
         .from('carts') as any)
@@ -550,21 +498,20 @@ export async function POST(request: NextRequest) {
     const discountAmount = 0;
     const taxAmount = 0;
     const totalAmount = Math.max(0, subtotal + shippingCost + taxAmount - discountAmount);
-    const provider = getPaymentProvider(paymentMethod);
     const nowIso = new Date().toISOString();
-
-    const initialTrackingTimeline = appendTrackingEvent([], {
-      status: 'paid',
-      at: nowIso,
-      label: 'Paiement confirme',
-      note: 'Paiement simule (mode test)',
-    });
+    const stripeAmount = toStripeAmount(totalAmount);
+    if (stripeAmount <= 0) {
+      return NextResponse.json(
+        { error: 'Montant invalide pour le paiement.' },
+        { status: 400 },
+      );
+    }
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from('commandes')
       .insert({
         user_id: user.id,
-        status: 'paid',
+        status: 'pending',
         subtotal,
         discount_amount: discountAmount,
         tax_amount: taxAmount,
@@ -575,13 +522,13 @@ export async function POST(request: NextRequest) {
           shipping_cost: shippingCost,
           has_physical_products: hasPhysicalProducts,
         },
-        payment_method: provider,
+        payment_method: 'stripe',
         estimated_delivery_at: null,
         processing_at: null,
         shipped_at: null,
         delivered_at: null,
         cancelled_at: null,
-        tracking_timeline: initialTrackingTimeline,
+        tracking_timeline: [],
         created_at: nowIso,
         updated_at: nowIso,
       })
@@ -608,9 +555,7 @@ export async function POST(request: NextRequest) {
       throw orderError;
     }
 
-    const orderItemsPayload = cartItems.map((item) => {
-      const workflow = buildInitialItemWorkflow(item, nowIso);
-      return {
+    const orderItemsPayload = cartItems.map((item) => ({
         commande_id: order.id,
         item_type: item.item_type,
         produit_id: item.item_type === 'produit' ? item.produit_id : null,
@@ -619,17 +564,16 @@ export async function POST(request: NextRequest) {
         quantity: Math.max(1, Number(item.quantity || 1)),
         unit_price: Number(item.unit_price || 0),
         total_price: Number(item.unit_price || 0) * Math.max(1, Number(item.quantity || 1)),
-        item_status: workflow.item_status,
-        authorized_at: workflow.authorized_at,
-        processing_at: workflow.processing_at,
-        shipped_at: workflow.shipped_at,
-        delivered_at: workflow.delivered_at,
-        cancelled_at: workflow.cancelled_at,
-        tracking_timeline: workflow.tracking_timeline,
+        item_status: 'paid',
+        authorized_at: null,
+        processing_at: null,
+        shipped_at: null,
+        delivered_at: null,
+        cancelled_at: null,
+        tracking_timeline: [],
         created_at: nowIso,
         updated_at: nowIso,
-      };
-    });
+      }));
 
     const { error: orderItemsError } = await (supabaseAdmin
       .from('commande_items') as any)
@@ -640,91 +584,96 @@ export async function POST(request: NextRequest) {
       throw orderItemsError;
     }
 
-    const simulatedReference = `SIM-${Date.now().toString(36).toUpperCase()}-${Math.random()
-      .toString(36)
-      .slice(2, 8)
-      .toUpperCase()}`;
-
     const { data: payment, error: paymentError } = await (supabaseAdmin
       .from('paiements') as any)
       .insert({
         user_id: user.id,
         commande_id: order.id,
         amount: totalAmount,
-        provider,
-        status: 'success',
+        provider: 'stripe',
+        status: 'pending',
         metadata: {
-          simulated: true,
-          simulated_reference: simulatedReference,
-          simulated_at: nowIso,
+          checkout_source: 'web',
+          created_at: nowIso,
         },
       })
       .select('id')
       .single();
 
     if (paymentError) {
-      console.error('Payment insert warning:', paymentError);
-    } else if (payment?.id) {
-      const { error: updatePaymentRefError } = await supabaseAdmin
-        .from('commandes')
-        .update({ payment_id: payment.id, updated_at: nowIso })
-        .eq('id', order.id);
-
-      if (updatePaymentRefError) {
-        console.error('Order payment_id update warning:', updatePaymentRefError);
-      }
+      await supabaseAdmin.from('commandes').delete().eq('id', order.id);
+      throw paymentError;
     }
 
-    if (hasDbCartItems) {
-      const { error: clearCartError } = await supabaseAdmin
-        .from('cart_items')
-        .delete()
-        .eq('cart_id', userCartId);
-
-      if (clearCartError) {
-        console.error('Cart clear primary attempt failed:', clearCartError);
-
-        const cartItemIds = cartItems.map((item) => item.id).filter((id) => !id.startsWith('client:'));
-        if (cartItemIds.length > 0) {
-          const { error: fallbackClearError } = await supabaseAdmin
-            .from('cart_items')
-            .delete()
-            .in('id', cartItemIds);
-
-          if (fallbackClearError) {
-            console.error('Cart clear fallback attempt failed:', fallbackClearError);
-            throw new Error('Panier non vide apres paiement.');
-          }
-        } else {
-          throw new Error('Panier non vide apres paiement.');
-        }
-      }
-    }
-
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('full_name')
-      .eq('id', user.id)
-      .maybeSingle();
-
+    const stripe = getStripeServerClient();
+    let paymentIntent;
     try {
-      await sendOrderCreatedEmail({
-        to: shipping.email || user.email || '',
-        customerName:
-          `${shipping.first_name} ${shipping.last_name}`.trim() ||
-          profile?.full_name ||
-          'Client',
-        orderId: order.id,
-        totalAmount,
-        currency: 'USD',
-        items: cartItems.map((item) => ({
-          itemName: getItemName(item),
-          quantity: Math.max(1, Number(item.quantity || 1)),
-          totalPrice: Number(item.unit_price || 0) * Math.max(1, Number(item.quantity || 1)),
-        })),
-      });
-    } catch (emailError) {
-      console.error('Order created email error:', emailError);
+      paymentIntent = await stripe.paymentIntents.create(
+        {
+          amount: stripeAmount,
+          currency: 'usd',
+          payment_method_types: ['card'],
+          receipt_email: shipping.email || user.email || undefined,
+          description: `Commande Myke Industrie ${String(order.id).slice(0, 8)}`,
+          metadata: {
+            order_id: order.id,
+            user_id: user.id,
+            payment_row_id: payment.id,
+            has_physical_products: hasPhysicalProducts ? '1' : '0',
+          },
+        },
+        {
+          idempotencyKey: `checkout-order-${order.id}`,
+        },
+      );
+    } catch (stripeError) {
+      const stripeMessage = stripeError instanceof Error ? stripeError.message : 'Stripe error';
+      const { error: pendingPaymentUpdateError } = await (supabaseAdmin
+        .from('paiements') as any)
+        .update({
+          status: 'failed',
+          metadata: {
+            checkout_source: 'web',
+            created_at: nowIso,
+            stripe_init_error: stripeMessage,
+            stripe_last_synced_at: new Date().toISOString(),
+          },
+        })
+        .eq('id', payment.id);
+
+      if (pendingPaymentUpdateError) {
+        console.error('Stripe init failure metadata update warning:', pendingPaymentUpdateError);
+      }
+
+      return NextResponse.json(
+        { error: 'Impossible de preparer le paiement pour le moment.' },
+        { status: 502 },
+      );
+    }
+
+    const { error: paymentMetadataUpdateError } = await (supabaseAdmin
+      .from('paiements') as any)
+      .update({
+        metadata: {
+          checkout_source: 'web',
+          created_at: nowIso,
+          stripe_payment_intent_id: paymentIntent.id,
+          stripe_payment_intent_status: paymentIntent.status,
+        },
+      })
+      .eq('id', payment.id);
+
+    if (paymentMetadataUpdateError) {
+      console.error('Payment metadata update warning:', paymentMetadataUpdateError);
+    }
+
+    const { error: orderPaymentRefError } = await supabaseAdmin
+      .from('commandes')
+      .update({ payment_id: payment.id, updated_at: nowIso })
+      .eq('id', order.id);
+
+    if (orderPaymentRefError) {
+      console.error('Order payment_id update warning:', orderPaymentRefError);
     }
 
     const { error: auditError } = await supabaseAdmin.from('audit_logs').insert({
@@ -733,9 +682,10 @@ export async function POST(request: NextRequest) {
       table_name: 'commandes',
       record_id: order.id,
       new_data: {
-        simulated_payment: true,
-        payment_provider: provider,
+        checkout_mode: 'stripe',
+        payment_provider: 'stripe',
         item_count: orderItemsPayload.length,
+        payment_intent_id: paymentIntent.id,
       },
     });
 
@@ -745,12 +695,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       orderId: order.id,
-      status: 'paid',
+      status: 'requires_payment',
+      paymentIntentId: paymentIntent.id,
+      clientSecret: paymentIntent.client_secret,
       totalAmount,
       currency: 'USD',
-      estimatedDeliveryAt: order.estimated_delivery_at,
-      message:
-        "Paiement simule valide. Votre commande est en traitement. La livraison peut durer jusqu'a 24h maximum.",
+      estimatedDeliveryAt: null,
+      message: 'Paiement initialise. Confirmez le paiement pour finaliser la commande.',
     });
   } catch (error) {
     console.error('Checkout error:', error);

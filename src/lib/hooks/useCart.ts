@@ -334,19 +334,22 @@ function mapGuestEntriesToLocalOnly(entries: GuestCartEntry[]): CartItem[] {
 }
 
 async function ensureUserCartId(supabase: BrowserSupabaseClient, userId: string): Promise<string | null> {
-  const { data: existingCartRaw, error: existingError } = await (supabase
+  const { data: existingCartsRaw, error: existingError } = await (supabase
     .from('carts') as any)
-    .select('id')
+    .select('id,created_at')
     .eq('user_id', userId)
-    .maybeSingle();
-  const existingCart = (existingCartRaw ?? null) as { id?: string } | null;
+    .order('created_at', { ascending: true })
+    .limit(10);
+  const existingCarts = (existingCartsRaw ?? []) as Array<{ id?: string }>;
 
   if (existingError) {
     console.error('Error loading user cart:', existingError);
     return null;
   }
 
-  if (existingCart?.id) return existingCart.id;
+  if (existingCarts.length > 0 && existingCarts[0]?.id) {
+    return existingCarts[0].id;
+  }
 
   const { data: insertedRaw, error: insertError } = await (supabase
     .from('carts') as any)
@@ -698,25 +701,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
 
-      try {
-        if (session?.user) {
-          await syncGuestCartToUser(supabase, session.user.id);
-          if (!active) return;
-          await fetchUserCart(supabase, session.user.id);
-        } else {
-          setItems(mapGuestEntriesToLocalOnly(readGuestCart()));
-          void fetchGuestCart(supabase);
+      // Avoid doing async work directly inside Supabase auth callback,
+      // because it can run while the auth lock is held.
+      window.setTimeout(async () => {
+        if (!active) return;
+
+        try {
+          if (session?.user) {
+            await syncGuestCartToUser(supabase, session.user.id);
+            if (!active) return;
+            await fetchUserCart(supabase, session.user.id);
+          } else {
+            setItems(mapGuestEntriesToLocalOnly(readGuestCart()));
+            void fetchGuestCart(supabase);
+          }
+        } catch (error) {
+          console.error('Error during auth change:', error);
         }
-      } catch (error) {
-        console.error('Error during auth change:', error);
-      }
-      
-      if (active) {
-        setLoading(false);
-      }
+
+        if (active) {
+          setLoading(false);
+        }
+      }, 0);
     });
 
     return () => {

@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { useCart } from '@/lib/hooks/useCart';
-import { getPrimaryProductImage } from '@/lib/products';
-import { Produit } from '@/lib/types';
-import { formatPrice } from '@/lib/utils/format';
-import { motion } from 'framer-motion';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { useCart } from "@/lib/hooks/useCart";
+import { getPrimaryProductImage } from "@/lib/products";
+import { Produit } from "@/lib/types";
+import { formatPrice } from "@/lib/utils/format";
+import { motion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowRight,
@@ -16,41 +16,42 @@ import {
   Heart,
   Package,
   ShoppingCart,
-} from 'lucide-react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { toast } from 'sonner';
+} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { toast } from "sonner";
 
 interface ProductCardProps {
   produit: Produit;
   index?: number;
 }
 
-function typeStyle(type: Produit['type']) {
-  if (type === 'chimique') {
+function typeStyle(type: Produit["type"]) {
+  if (type === "chimique") {
     return {
-      priceBadge: 'bg-amber-500/90 hover:bg-amber-500 text-slate-950',
-      ring: 'group-hover:ring-amber-300',
-      noteClass: 'text-amber-700',
+      priceBadge: "bg-amber-500/90 hover:bg-amber-500 text-slate-950",
+      ring: "group-hover:ring-amber-300",
+      noteClass: "text-amber-700",
     };
   }
-  if (type === 'document') {
+  if (type === "document") {
     return {
-      priceBadge: 'bg-cyan-500/90 hover:bg-cyan-500 text-white',
-      ring: 'group-hover:ring-cyan-300',
-      noteClass: 'text-cyan-700',
+      priceBadge: "bg-cyan-500/90 hover:bg-cyan-500 text-white",
+      ring: "group-hover:ring-cyan-300",
+      noteClass: "text-cyan-700",
     };
   }
   return {
-    priceBadge: 'bg-slate-900/90 hover:bg-slate-900 text-white',
-    ring: 'group-hover:ring-slate-300',
-    noteClass: 'text-slate-600',
+    priceBadge: "bg-slate-900/90 hover:bg-slate-900 text-white",
+    ring: "group-hover:ring-slate-300",
+    noteClass: "text-slate-600",
   };
 }
 
 export default function ProductCard({ produit, index = 0 }: ProductCardProps) {
   const { addItem } = useCart();
-  const imageSrc = getPrimaryProductImage(produit.images) || '/images/placeholder-product.svg';
+  const imageSrc =
+    getPrimaryProductImage(produit.images) || "/images/placeholder-product.svg";
   const minOrderQuantity = Math.max(1, Number(produit.min_order || 1));
   const isOutOfStock = produit.stock !== null && produit.stock <= 0;
   const style = typeStyle(produit.type);
@@ -60,18 +61,18 @@ export default function ProductCard({ produit, index = 0 }: ProductCardProps) {
     event.stopPropagation();
 
     if (isOutOfStock) {
-      toast.error('Produit en rupture de stock');
+      toast.error("Produit en rupture de stock");
       return;
     }
 
     if (produit.stock !== null && minOrderQuantity > produit.stock) {
-      toast.error('Stock insuffisant pour la quantite minimale');
+      toast.error("Stock insuffisant pour la quantite minimale");
       return;
     }
 
     try {
       await addItem({
-        item_type: 'produit',
+        item_type: "produit",
         item_id: produit.id,
         unit_price: produit.price,
         quantity: minOrderQuantity,
@@ -83,20 +84,22 @@ export default function ProductCard({ produit, index = 0 }: ProductCardProps) {
       toast.success(
         minOrderQuantity > 1
           ? `${minOrderQuantity} unites ajoutees au panier`
-          : 'Produit ajoute au panier',
+          : "Produit ajoute au panier",
       );
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Erreur lors de l'ajout au panier";
+        error instanceof Error
+          ? error.message
+          : "Erreur lors de l'ajout au panier";
       toast.error(message);
     }
   };
 
   const getTypeIcon = () => {
     switch (produit.type) {
-      case 'chimique':
+      case "chimique":
         return <Beaker className="h-4 w-4 text-amber-500" />;
-      case 'document':
+      case "document":
         return <FileText className="h-4 w-4 text-cyan-600" />;
       default:
         return <Package className="h-4 w-4 text-slate-600" />;
@@ -105,12 +108,12 @@ export default function ProductCard({ produit, index = 0 }: ProductCardProps) {
 
   const getTypeLabel = () => {
     switch (produit.type) {
-      case 'chimique':
-        return 'Chimique';
-      case 'document':
-        return 'Document';
+      case "chimique":
+        return "Chimique";
+      case "document":
+        return "Document";
       default:
-        return 'Produit';
+        return "Produit";
     }
   };
 
@@ -140,7 +143,7 @@ export default function ProductCard({ produit, index = 0 }: ProductCardProps) {
 
           <div className="absolute top-4 left-4 flex flex-col gap-2">
             <Badge className={`${style.priceBadge} font-semibold px-3 py-1`}>
-              {formatPrice(produit.price, 'USD')}
+              {formatPrice(produit.price, "USD")}
             </Badge>
             <Badge
               variant="secondary"
@@ -151,7 +154,7 @@ export default function ProductCard({ produit, index = 0 }: ProductCardProps) {
             </Badge>
           </div>
 
-          {produit.type === 'chimique' && produit.signal_word && (
+          {produit.type === "chimique" && produit.signal_word && (
             <div className="absolute top-4 right-4">
               <Badge
                 variant="destructive"
@@ -165,7 +168,9 @@ export default function ProductCard({ produit, index = 0 }: ProductCardProps) {
 
           {produit.featured && (
             <div className="absolute bottom-4 left-4">
-              <Badge className="bg-slate-900/90 text-white font-medium">En vedette</Badge>
+              <Badge className="bg-slate-900/90 text-white font-medium">
+                En vedette
+              </Badge>
             </div>
           )}
 
@@ -195,24 +200,30 @@ export default function ProductCard({ produit, index = 0 }: ProductCardProps) {
               <span
                 className={`text-sm font-medium ${
                   produit.stock > 5
-                    ? 'text-emerald-600'
+                    ? "text-emerald-600"
                     : produit.stock > 0
-                      ? 'text-amber-600'
-                      : 'text-red-600'
+                      ? "text-amber-600"
+                      : "text-red-600"
                 }`}
               >
-                {produit.stock > 0 ? `${produit.stock} en stock` : 'Rupture de stock'}
+                {produit.stock > 0
+                  ? `${produit.stock} en stock`
+                  : "Rupture de stock"}
               </span>
             ) : (
               <span className="text-sm text-slate-500">Stock illimite</span>
             )}
-            {produit.unit && <span className="text-sm text-slate-400">/{produit.unit}</span>}
+            {produit.unit && (
+              <span className="text-sm text-slate-400">/{produit.unit}</span>
+            )}
           </div>
 
           {minOrderQuantity > 1 && (
-            <p className={`text-xs mb-3 ${style.noteClass}`}>Quantite minimale: {minOrderQuantity}</p>
+            <p className={`text-xs mb-3 ${style.noteClass}`}>
+              Quantite minimale: {minOrderQuantity}
+            </p>
           )}
-          {produit.type === 'document' && (
+          {produit.type === "document" && (
             <p className="text-xs text-cyan-700 mb-3">
               Document numerique: acces rapide apres paiement.
             </p>
@@ -220,24 +231,15 @@ export default function ProductCard({ produit, index = 0 }: ProductCardProps) {
 
           <div className="flex gap-2">
             <Button
-              className="flex-1 bg-slate-900 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 group/btn"
+              className="flex-1 bg-slate-900 text-gray-200 hover:bg-amber-500 hover:text-slate-950 transition-all duration-300 group/btn"
               onClick={handleAddToCart}
               disabled={isOutOfStock}
             >
               <ShoppingCart className="h-4 w-4 mr-2" />
-              {minOrderQuantity > 1 ? `Ajouter x${minOrderQuantity}` : 'Ajouter'}
+              {minOrderQuantity > 1
+                ? `Ajouter x${minOrderQuantity}`
+                : "Ajouter"}
               <ArrowRight className="h-4 w-4 ml-1 opacity-0 -translate-x-2 group-hover/btn:opacity-100 group-hover/btn:translate-x-0 transition-all" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="border-slate-200 hover:border-amber-400 hover:text-amber-600"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-            >
-              <Heart className="h-4 w-4" />
             </Button>
           </div>
         </CardContent>

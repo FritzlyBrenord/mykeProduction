@@ -26,6 +26,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const RESEND_COOLDOWN_SECONDS = 60;
+const AUTH_OP_TIMEOUT_MS = 12000;
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
@@ -56,6 +57,38 @@ function readRecoveryTypeFromUrl() {
   return hashParams.get("type") === "recovery";
 }
 
+function readRecoveryTokensFromUrl() {
+  if (typeof window === "undefined") return null;
+
+  const url = new URL(window.location.href);
+  const queryAccessToken = url.searchParams.get("access_token");
+  const queryRefreshToken = url.searchParams.get("refresh_token");
+  if (queryAccessToken && queryRefreshToken) {
+    return {
+      accessToken: queryAccessToken,
+      refreshToken: queryRefreshToken,
+    };
+  }
+
+  const hash = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  if (!hash) return null;
+
+  const hashParams = new URLSearchParams(hash);
+  const hashAccessToken = hashParams.get("access_token");
+  const hashRefreshToken = hashParams.get("refresh_token");
+
+  if (!hashAccessToken || !hashRefreshToken) {
+    return null;
+  }
+
+  return {
+    accessToken: hashAccessToken,
+    refreshToken: hashRefreshToken,
+  };
+}
+
 function readHashAuthErrorFromUrl() {
   if (typeof window === "undefined") return null;
 
@@ -84,6 +117,10 @@ function readHashAuthErrorFromUrl() {
 function formatAuthError(message: string) {
   const normalized = message.toLowerCase();
 
+  if (normalized.includes("timed out") || normalized.includes("timeout")) {
+    return "Operation trop longue. Fermez les autres onglets ouverts puis reessayez.";
+  }
+
   if (normalized.includes("expired")) {
     return "Le lien de reinitialisation a expire. Demandez un nouveau lien.";
   }
@@ -92,14 +129,35 @@ function formatAuthError(message: string) {
     return "Le lien de reinitialisation est invalide. Demandez un nouveau lien.";
   }
 
-  if (
-    normalized.includes("rate limit") ||
+  if (normalized.includes("rate limit") ||
     normalized.includes("over_email_send_rate_limit")
   ) {
     return "Trop de demandes. Attendez avant de renvoyer un nouvel email.";
   }
 
-  return "Action impossible pour le moment. Reessayez dans quelques instants.";
+  if (normalized.includes("same as the old password") || normalized.includes("different from the old")) {
+    return "Le nouveau mot de passe doit etre different de l'ancien.";
+  }
+
+  // If we don't have a custom translation, show the actual Supabase error so we can debug it
+  return message || "Action impossible pour le moment. Reessayez dans quelques instants.";
+}
+
+async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error(message));
+      }, timeoutMs);
+    });
+    return await Promise.race([operation, timeoutPromise]);
+  } finally {
+    if (timer !== null) {
+      clearTimeout(timer);
+    }
+  }
 }
 
 function formatHashAuthError(
@@ -180,9 +238,30 @@ export default function ResetPasswordPage() {
         const hasRecoveryType = readRecoveryTypeFromUrl();
 
         if (hasRecoveryType) {
-          const {
+          let {
             data: { session },
           } = await supabase.auth.getSession();
+
+          if (!session?.user) {
+            const recoveryTokens = readRecoveryTokensFromUrl();
+
+            if (recoveryTokens) {
+              const { data: recoveredSessionData, error: recoveredSessionError } =
+                await supabase.auth.setSession({
+                  access_token: recoveryTokens.accessToken,
+                  refresh_token: recoveryTokens.refreshToken,
+                });
+
+              if (recoveredSessionError) {
+                if (!active) return;
+                setErrorMessage(formatAuthError(recoveredSessionError.message || ""));
+                setMode("request");
+                return;
+              }
+
+              session = recoveredSessionData.session;
+            }
+          }
 
           if (!active) return;
 
@@ -293,7 +372,11 @@ export default function ResetPasswordPage() {
     setIsSubmittingPassword(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await withTimeout(
+        supabase.auth.updateUser({ password: newPassword }),
+        AUTH_OP_TIMEOUT_MS,
+        "Auth operation timed out",
+      );
 
       if (error) {
         setErrorMessage(formatAuthError(error.message || ""));
@@ -305,7 +388,9 @@ export default function ResetPasswordPage() {
       setSuccessMessage("Mot de passe mis a jour avec succes. Connectez-vous avec le nouveau mot de passe.");
       toast.success("Mot de passe mis a jour.");
 
-      await supabase.auth.signOut();
+      void supabase.auth.signOut().catch(() => {
+        // Best effort: redirect continues even if local signout is slow/fails.
+      });
 
       window.setTimeout(() => {
         router.replace("/auth/connexion");

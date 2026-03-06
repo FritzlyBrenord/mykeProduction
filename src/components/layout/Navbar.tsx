@@ -12,6 +12,7 @@ import {
   BookOpen,
   Newspaper,
   ShoppingBag,
+  ReceiptText,
   PlayCircle,
   LogOut,
   ChevronRight,
@@ -287,6 +288,19 @@ export default function Navbar() {
                     >
                       <ShoppingBag className="h-4 w-4 text-amber-400/70" />
                       Mes Commandes
+                      <ChevronRight className="h-4 w-4 ml-auto text-slate-500" />
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    asChild
+                    className="text-slate-300 focus:text-white focus:bg-white/5 cursor-pointer"
+                  >
+                    <Link
+                      href="/compte/transactions"
+                      className="flex items-center gap-2 py-2.5"
+                    >
+                      <ReceiptText className="h-4 w-4 text-amber-400/70" />
+                      Mes Transactions
                       <ChevronRight className="h-4 w-4 ml-auto text-slate-500" />
                     </Link>
                   </DropdownMenuItem>

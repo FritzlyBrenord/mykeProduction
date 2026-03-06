@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   BadgeCheck,
-  CalendarDays,
   CreditCard,
   Download,
   Filter,
@@ -15,6 +14,9 @@ import {
   ShoppingBag,
   TriangleAlert,
   Wallet,
+  ChevronDown,
+  ChevronUp,
+  Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, formatDateTime, formatPrice } from "@/lib/utils";
@@ -133,17 +135,253 @@ function customerLabel(payment: PaymentTransaction) {
   return payment.customer.full_name || payment.customer.email || "Client";
 }
 
-function actionReference(payment: PaymentTransaction) {
-  const simulatedRef = payment.metadata?.simulated_reference;
-  if (typeof simulatedRef === "string" && simulatedRef.trim()) return simulatedRef;
-  return payment.id;
-}
-
 function csvEscape(value: string) {
   if (value.includes(",") || value.includes("\"") || value.includes("\n")) {
     return `"${value.replace(/"/g, "\"\"")}"`;
   }
   return value;
+}
+
+function formatShortId(id: string | null | undefined, prefix: string) {
+  if (!id) return "N/A";
+  return `${prefix}${id.slice(0, 8)}`;
+}
+
+function TransactionRow({ transaction }: { transaction: PaymentTransaction }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const status = statusConfig[transaction.status];
+  const provider = providerConfig[transaction.provider];
+  const StatusIcon = status.icon;
+
+  const handlePrintTransaction = () => {
+    // Open a temporary printable window with just this content
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Recu - ${formatShortId(transaction.id, "P")}</title>
+        <style>
+          body { font-family: system-ui, -apple-system, sans-serif; color: #1e293b; padding: 40px; }
+          .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 20px; }
+          .title { font-size: 24px; font-weight: bold; margin: 0 0 10px 0; }
+          .subtitle { font-size: 14px; color: #64748b; margin: 0; }
+          .row { display: flex; justify-content: space-between; margin-bottom: 12px; }
+          .label { font-weight: 600; color: #475569; }
+          .value { color: #0f172a; }
+          .table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          .table th, .table td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+          .table th { background: #f8fafc; font-weight: 600; color: #475569; }
+          .total { margin-top: 20px; text-align: right; font-size: 20px; font-weight: bold; padding-top: 20px; border-top: 2px solid #e2e8f0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 class="title">Recu de Paiement</h1>
+          <p class="subtitle">Genere le ${new Date().toLocaleString('fr-FR')}</p>
+        </div>
+        
+        <div class="row">
+          <span class="label">Reference Paiement:</span>
+          <span class="value">${transaction.id} (${formatShortId(transaction.id, "P")})</span>
+        </div>
+        <div class="row">
+          <span class="label">Reference Commande:</span>
+          <span class="value">${transaction.commande_id || "N/A"} (${formatShortId(transaction.commande_id, "#")})</span>
+        </div>
+        <div class="row">
+          <span class="label">Date:</span>
+          <span class="value">${formatDateTime(transaction.created_at)}</span>
+        </div>
+        <div class="row">
+          <span class="label">Client:</span>
+          <span class="value">${customerLabel(transaction)} ${transaction.customer.email ? `(${transaction.customer.email})` : ''}</span>
+        </div>
+        <div class="row">
+          <span class="label">Methode:</span>
+          <span class="value">${provider.label}</span>
+        </div>
+        <div class="row">
+          <span class="label">Statut:</span>
+          <span class="value">${status.label}</span>
+        </div>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Article</th>
+              <th>Qte</th>
+              <th style="text-align: right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${transaction.items.map(item => `
+              <tr>
+                <td>${itemTypeConfig[item.item_type].label}</td>
+                <td>${item.label}</td>
+                <td>${item.quantity}</td>
+                <td style="text-align: right;">${formatPrice(item.total_price)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="total">
+          Montant paye: ${formatPrice(Number(transaction.amount || 0))}
+        </div>
+      </body>
+      <script>
+        window.onload = function() { window.print(); window.close(); }
+      </script>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  return (
+    <article className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4 transition hover:border-[var(--primary)]/40 print:border-none print:shadow-none print:p-0 print:mb-4">
+      <div 
+        className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between cursor-pointer group"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="space-y-2 flex-grow">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-[var(--foreground)]" title={transaction.id}>
+              {formatShortId(transaction.id, "P")}
+            </span>
+            <span className="text-xs text-[var(--muted)]" title={transaction.commande_id || ""}>
+              {formatShortId(transaction.commande_id, "#")}
+            </span>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
+                status.className,
+              )}
+            >
+              <StatusIcon className="h-3.5 w-3.5" />
+              {status.label}
+            </span>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
+                provider.className,
+              )}
+            >
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-white/70 text-[10px] font-bold">
+                {provider.badge}
+              </span>
+              {provider.label}
+            </span>
+            <div className="ml-auto lg:hidden">
+              {isExpanded ? <ChevronUp className="h-4 w-4 text-[var(--muted)]" /> : <ChevronDown className="h-4 w-4 text-[var(--muted)]" />}
+            </div>
+          </div>
+
+          <p className="text-sm text-[var(--foreground)]">
+            {customerLabel(transaction)}
+            {transaction.customer.email ? (
+              <span className="ml-2 text-xs text-[var(--muted)]">
+                ({transaction.customer.email})
+              </span>
+            ) : null}
+          </p>
+        </div>
+
+        <div className="flex items-start gap-4 justify-between lg:justify-end">
+          <div className="space-y-1 text-left lg:text-right">
+            <p className="text-xl font-bold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">
+              {formatPrice(Number(transaction.amount || 0))}
+            </p>
+            <p className="text-xs text-[var(--muted)]">
+              {formatDateTime(transaction.created_at)}
+            </p>
+          </div>
+          <div className="hidden lg:flex items-center justify-center pt-2">
+            {isExpanded ? <ChevronUp className="h-5 w-5 text-[var(--muted)] group-hover:text-[var(--primary)] transition-colors" /> : <ChevronDown className="h-5 w-5 text-[var(--muted)] group-hover:text-[var(--primary)] transition-colors" />}
+          </div>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="mt-4 pt-4 border-t border-[var(--border)] print:block"
+        >
+          <div className="flex justify-between items-center mb-4 print:hidden">
+             <h4 className="text-sm font-semibold text-[var(--foreground)]">Details de la transaction</h4>
+             <Button variant="outline" size="sm" className="h-8 gap-2" onClick={(e) => { e.stopPropagation(); handlePrintTransaction(); }}>
+               <Printer className="h-3.5 w-3.5" /> Imprimer le recu
+             </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+            <div className="space-y-3">
+               <div>
+                 <span className="text-[var(--muted)] block text-xs">ID Complet</span>
+                 <span className="font-mono text-xs">{transaction.id}</span>
+               </div>
+               {transaction.commande_id && (
+                 <div>
+                   <span className="text-[var(--muted)] block text-xs">Commande ID Complet</span>
+                   <span className="font-mono text-xs">{transaction.commande_id}</span>
+                 </div>
+               )}
+            </div>
+
+            <div className="space-y-3">
+               <div className="p-3 bg-[var(--card)] rounded-lg border border-[var(--border)]">
+                 <div className="flex justify-between items-center mb-2">
+                   <span className="text-[var(--muted)] font-medium">Contenu de l'achat</span>
+                   <div className="flex flex-wrap gap-1.5 justify-end">
+                      {transaction.summary.item_types.length > 0 ? (
+                        transaction.summary.item_types.map((type) => (
+                          <span
+                            key={`${transaction.id}-badge-${type}`}
+                            className={cn(
+                              "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                              itemTypeConfig[type].className,
+                            )}
+                          >
+                            {itemTypeConfig[type].label}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="rounded-full border border-zinc-300 px-2 py-0.5 text-[10px] text-zinc-500">
+                          Sans article
+                        </span>
+                      )}
+                    </div>
+                 </div>
+
+                 {transaction.items.length > 0 ? (
+                    <div className="space-y-2 mt-3">
+                      {transaction.items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-start text-xs border-t border-[var(--border)] pt-2 mt-2 first:border-0 first:pt-0 first:mt-0">
+                          <span className="text-[var(--foreground)]">{item.label} <span className="text-[var(--muted)]">x{item.quantity}</span></span>
+                          <span className="font-medium whitespace-nowrap ml-2">{formatPrice(item.total_price)}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-center pt-3 border-t border-[var(--border)] mt-3">
+                         <span className="font-medium text-[var(--muted)]">Total lignes:</span>
+                         <span className="font-bold">{formatPrice(transaction.summary.total_items_amount)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[var(--muted)] mt-2">Aucun detail d'article disponible.</p>
+                  )}
+               </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </article>
+  );
 }
 
 export default function PaiementsPage() {
@@ -263,7 +501,7 @@ export default function PaiementsPage() {
       (acc, row) => {
         row.items.forEach((item) => {
           const bucket = acc[item.item_type];
-          bucket.count += 1;
+          bucket.count += item.quantity || 1;
           bucket.amount += Number(item.total_price || 0);
         });
         return acc;
@@ -274,6 +512,13 @@ export default function PaiementsPage() {
         video: { count: 0, amount: 0 },
       } as Record<ItemType, { count: number; amount: number }>,
     );
+
+    const typesTotalAmount = 
+      typeSummary.produit.amount + 
+      typeSummary.formation.amount + 
+      typeSummary.video.amount;
+
+    const feesAmount = successAmount - typesTotalAmount;
 
     return {
       total,
@@ -287,16 +532,9 @@ export default function PaiementsPage() {
       successRate,
       totalItemQuantity,
       typeSummary,
+      feesAmount,
     };
   }, [filteredTransactions]);
-
-  const successActions = useMemo(
-    () =>
-      filteredTransactions
-        .filter((row) => row.status === "success")
-        .slice(0, 8),
-    [filteredTransactions],
-  );
 
   const exportCsv = () => {
     if (filteredTransactions.length === 0) return;
@@ -344,8 +582,12 @@ export default function PaiementsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleGlobalPrint = () => {
+    window.print();
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-0 print:p-0">
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
@@ -362,10 +604,14 @@ export default function PaiementsPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 print:hidden">
             <Button variant="outline" className="gap-2" onClick={() => void loadTransactions()}>
               <RefreshCw className="h-4 w-4" />
               Actualiser
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={handleGlobalPrint} disabled={filteredTransactions.length === 0}>
+              <Printer className="h-4 w-4" />
+              Imprimer la liste
             </Button>
             <Button className="gap-2" onClick={exportCsv} disabled={filteredTransactions.length === 0}>
               <Download className="h-4 w-4" />
@@ -422,10 +668,10 @@ export default function PaiementsPage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid grid-cols-1 gap-4 lg:grid-cols-12"
+        className="grid grid-cols-1 gap-4 lg:grid-cols-12 print:block print:w-full"
       >
-        <div className="lg:col-span-8 space-y-4">
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+        <div className="lg:col-span-8 space-y-4 print:w-full print:block">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 print:hidden">
             <div className="mb-3 flex items-center gap-2">
               <Filter className="h-4 w-4 text-[var(--muted)]" />
               <p className="text-sm font-medium text-[var(--foreground)]">Filtres</p>
@@ -505,101 +751,10 @@ export default function PaiementsPage() {
                 Aucune transaction ne correspond aux filtres.
               </div>
             ) : (
-              <div className="space-y-3">
-                {paginatedTransactions.map((transaction) => {
-                  const status = statusConfig[transaction.status];
-                  const provider = providerConfig[transaction.provider];
-                  const StatusIcon = status.icon;
-                  return (
-                    <article
-                      key={transaction.id}
-                      className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4 transition hover:border-[var(--primary)]/40"
-                    >
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-semibold text-[var(--foreground)]">
-                              {transaction.id}
-                            </span>
-                            <span className="text-xs text-[var(--muted)]">
-                              {transaction.commande_id || "Sans commande"}
-                            </span>
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
-                                status.className,
-                              )}
-                            >
-                              <StatusIcon className="h-3.5 w-3.5" />
-                              {status.label}
-                            </span>
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
-                                provider.className,
-                              )}
-                            >
-                              <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-white/70 text-[10px] font-bold">
-                                {provider.badge}
-                              </span>
-                              {provider.label}
-                            </span>
-                          </div>
-
-                          <p className="text-sm text-[var(--foreground)]">
-                            {customerLabel(transaction)}
-                            {transaction.customer.email ? (
-                              <span className="ml-2 text-xs text-[var(--muted)]">
-                                ({transaction.customer.email})
-                              </span>
-                            ) : null}
-                          </p>
-
-                          <div className="flex flex-wrap gap-1.5">
-                            {transaction.summary.item_types.length > 0 ? (
-                              transaction.summary.item_types.map((type) => (
-                                <span
-                                  key={`${transaction.id}-${type}`}
-                                  className={cn(
-                                    "rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                                    itemTypeConfig[type].className,
-                                  )}
-                                >
-                                  {itemTypeConfig[type].label}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="rounded-full border border-zinc-300 px-2 py-0.5 text-[11px] text-zinc-500">
-                                Sans article
-                              </span>
-                            )}
-                          </div>
-
-                          {transaction.items.length > 0 && (
-                            <p className="line-clamp-2 text-xs text-[var(--muted)]">
-                              {transaction.items
-                                .map((item) => `${item.label} x${item.quantity}`)
-                                .join(" | ")}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="space-y-1 text-right">
-                          <p className="text-xl font-bold text-[var(--foreground)]">
-                            {formatPrice(Number(transaction.amount || 0))}
-                          </p>
-                          <p className="text-xs text-[var(--muted)]">
-                            {formatDateTime(transaction.created_at)}
-                          </p>
-                          <p className="text-xs text-[var(--muted)]">
-                            Qté: {transaction.summary.total_quantity} |{" "}
-                            Total lignes: {formatPrice(transaction.summary.total_items_amount)}
-                          </p>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+              <div className="space-y-3 print:space-y-2">
+                {paginatedTransactions.map((transaction) => (
+                  <TransactionRow key={transaction.id} transaction={transaction} />
+                ))}
 
                 {totalPages > 1 && (
                   <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -637,7 +792,7 @@ export default function PaiementsPage() {
           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-4">
+        <div className="lg:col-span-4 space-y-4 print:hidden">
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
             <h3 className="mb-3 font-semibold text-[var(--foreground)]">Répartition des ventes</h3>
             <div className="space-y-2">
@@ -661,36 +816,23 @@ export default function PaiementsPage() {
                   </p>
                 </div>
               ))}
-            </div>
-          </div>
 
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
-            <h3 className="mb-3 font-semibold text-[var(--foreground)]">Actions réussies</h3>
-            {loading ? (
-              <div className="py-6 text-sm text-[var(--muted)]">Chargement...</div>
-            ) : successActions.length === 0 ? (
-              <div className="py-6 text-sm text-[var(--muted)]">Aucune action réussie sur ce filtre.</div>
-            ) : (
-              <div className="space-y-2">
-                {successActions.map((transaction) => (
-                  <div
-                    key={`action-${transaction.id}`}
-                    className="rounded-xl border border-emerald-500/20 bg-emerald-500/8 p-3"
-                  >
-                    <p className="text-sm font-medium text-[var(--foreground)]">
-                      {actionReference(transaction)}
-                    </p>
-                    <p className="mt-0.5 text-xs text-[var(--muted)]">
-                      {customerLabel(transaction)} • {formatPrice(transaction.amount)}
-                    </p>
-                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-emerald-600">
-                      <CalendarDays className="h-3.5 w-3.5" />
-                      {formatDateTime(transaction.created_at)}
-                    </p>
+              {stats.feesAmount > 0 && (
+                <div className="rounded-xl border border-[var(--border)] border-dashed bg-[var(--background)] p-3 mt-4 opacity-80">
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full border px-2 py-0.5 text-xs font-medium bg-zinc-500/10 text-zinc-600 border-zinc-500/20">
+                      Livraison / Taxes
+                    </span>
+                    <span className="text-sm font-semibold text-[var(--foreground)]">
+                      -
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Frais annexes: {formatPrice(stats.feesAmount)}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </motion.section>

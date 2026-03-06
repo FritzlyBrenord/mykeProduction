@@ -107,6 +107,11 @@ function itemStatusClass(status: string) {
   return 'bg-slate-100 text-slate-700 border-slate-200';
 }
 
+function paymentMethodLabel(method: string | null | undefined) {
+  if (method === 'paypal') return 'Paiement en ligne';
+  return 'Carte';
+}
+
 export default function OrderTrackingPage() {
   const params = useParams<{ id: string }>();
   const [order, setOrder] = useState<OrderTracking | null>(null);
@@ -308,7 +313,7 @@ export default function OrderTrackingPage() {
                   <p className="text-sm font-medium">Paiement</p>
                 </div>
                 <p className="mt-2 text-slate-900 font-semibold capitalize">
-                  {order.payment?.provider || order.payment_method || 'N/A'} -{' '}
+                  {paymentMethodLabel(order.payment?.provider || order.payment_method)} -{' '}
                   {order.payment?.status || 'pending'}
                 </p>
               </div>
