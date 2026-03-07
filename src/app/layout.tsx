@@ -15,18 +15,25 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://mykeindustrie.com"),
   title: "Myke Industrie - Excellence Industrielle",
   description:
-    "Formations professionnelles, articles experts, produits chimiques certifiés et vidéos exclusives pour les industriels d'élite.",
+    "Formations professionnelles, articles experts, produits chimiques certifiés et vidéos exclusives pour les industriels.",
   keywords:
-    "formation industrielle, produits chimiques, articles techniques, vidéos industrie",
+    "formation industrielle, produits chimiques, industrie, formation technique",
+  robots: {
+    index: true,
+    follow: true,
+  },
   icons: {
     icon: "/myke.ico",
-    shortcut: "/myke.ico",
   },
   openGraph: {
-    title: "Myke Industrie",
-    description: "Excellence Industrielle",
+    title: "Myke Industrie - Excellence Industrielle",
+    description:
+      "Formations professionnelles et ressources pour les industriels.",
+    url: "https://mykeindustrie.com",
+    siteName: "Myke Industrie",
     type: "website",
   },
 };
